@@ -68,6 +68,7 @@ demo bundle (the pipeline's `_bundle_demo` handles the latter).
 | `GET /api/briefings` | per-station deterministic briefings |
 | `GET /api/replay-frames` | per-zone monthly counts (historical replay) |
 | `GET /api/offenders` | repeat-vehicle traces + time-wise logs (anonymized vehicle IDs only) |
+| `GET /api/daily` | per-zone/station/city daily ticket series (drives the Time Lens + officer-demand) |
 
 All responses go through `ok()` → `_scrub()`. Use that wrapper for new routes.
 
@@ -95,9 +96,9 @@ that decays toward 0), and `operational_priority` = clamp(hist + boost, 0..100).
 
 | Route | Purpose |
 |------|------|
-| `GET /api/operational/snapshot` | live zones + complaints + dispatches + counts (decayed) |
+| `GET /api/operational/snapshot` | live zones + complaints (w/ `vehicle_number`, `station`) + dispatches (w/ `station`, `zone_name`) + counts (decayed) |
 | `GET /api/operational/changes?since=` | delta since a timestamp (for polling) |
-| `POST /api/complaints` | citizen complaint → nearest zone, bumps boost |
+| `POST /api/complaints` | citizen complaint (+ `vehicle_number`) → nearest zone + nearest station, bumps boost |
 | `POST /api/officer-feedback` | verified/needs_towing/action_taken/cleared/false_alarm/no_obstruction/structural_issue |
 | `POST /api/dispatches` | create dispatch |
 | `PATCH /api/dispatches/{id}/status` | advance dispatch state (cleared resets boost; escalation flags) |

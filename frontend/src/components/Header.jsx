@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { isLive, api } from "../lib/api.js";
+import { isLive } from "../lib/api.js";
 import { nowIST } from "../lib/format.js";
+import { Icon } from "./icons.jsx";
+import SearchBox from "./SearchBox.jsx";
 
 function syncLabel(ts) {
   if (!ts) return "never";
@@ -10,11 +12,9 @@ function syncLabel(ts) {
   return `${Math.round(s / 60)}m ago`;
 }
 
-export default function Header({ kpis, onOpenZone, setView, snapshot, lastSync,
-                                onSync, onAbout, onTour }) {
+export default function Header({ kpis, onSearchPick, snapshot, lastSync,
+                                onSync, onAbout, onTour, auth, scopeName, onLogout, onMenu }) {
   const [clock, setClock] = useState(nowIST());
-  const [q, setQ] = useState("");
-  const [hits, setHits] = useState([]);
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -22,50 +22,48 @@ export default function Header({ kpis, onOpenZone, setView, snapshot, lastSync,
     return () => clearInterval(t);
   }, []);
 
-  async function search(v) {
-    setQ(v);
-    if (v.length < 2) return setHits([]);
-    try {
-      const r = await api("/api/search?q=" + encodeURIComponent(v));
-      setHits(r.slice(0, 6));
-    } catch {
-      setHits([]);
-    }
-  }
-
   return (
     <header className="header">
-      <div className="wordmark">Clear<span className="lane">Lane</span></div>
-      <div className="meta">{kpis.data_window}</div>
-      <div className="spacer" />
-      <div style={{ position: "relative" }}>
-        <input className="searchbox" placeholder="Search junction / zone…"
-          value={q} onChange={(e) => search(e.target.value)} />
-        {hits.length > 0 && (
-          <div className="map-overlay" style={{ position: "absolute", top: 32, right: 0, zIndex: 2000 }}>
-            {hits.map((h) => (
-              <div key={h.id} className="kv" style={{ cursor: "pointer" }}
-                onClick={() => { setView("command"); onOpenZone(h.id, true); setHits([]); setQ(""); }}>
-                <span>{h.label}</span><span className="muted mono">{h.tier}</span>
-              </div>
-            ))}
-          </div>
-        )}
+      <button className="icon-btn hamburger" onClick={onMenu} aria-label="menu">
+        <Icon name="menu" size={24} />
+      </button>
+      <div className="wordmark">
+        <span className="brand-mark hdr-mark"><Icon name="lane" size={28} strokeWidth={2} /></span>
+        Clear<span className="lane">Lane</span>
       </div>
+      <div className="meta hide-lg">{kpis.data_window}</div>
+      <div className="spacer" />
+
+      <SearchBox onPick={onSearchPick} cls="hide-md" />
+
       {snapshot?.counts && (
-        <span className="meta" title="operational layer">
-          ⚑ {snapshot.counts.open_dispatches} dispatch · {snapshot.counts.active_complaints} complaint
+        <span className="meta hide-lg" title="operational layer">
+          <span className="op-pulse" style={{ color: "var(--amber)" }}>⚑</span> {snapshot.counts.open_dispatches} dispatch · {snapshot.counts.active_complaints} complaint
         </span>
       )}
-      <span className="meta mono" title="last operational sync">sync {syncLabel(lastSync)}</span>
-      <button className="btn" onClick={onSync} title="refresh operational data">⟳</button>
-      <button className="btn" onClick={() => { window.location.hash = "#/officer"; }}>On Duty</button>
-      <button className="btn" onClick={onAbout}>About / PS1</button>
-      <button className="btn accent" onClick={onTour}>▶ Judge Tour</button>
-      <span className="mono meta">{clock}</span>
+      <button className="icon-btn hide-md" onClick={onSync}
+        title={`refresh operational data · sync ${syncLabel(lastSync)}`}>
+        <Icon name="sync" size={24} />
+      </button>
+      <button className="btn hide-md" onClick={() => { window.location.hash = "#/officer"; }}>
+        <Icon name="location" size={14} /> On Duty</button>
+      <button className="btn hide-lg" onClick={onAbout}>About</button>
+      <button className="btn accent hide-md" onClick={onTour}>▶ Tour</button>
+      <span className="mono meta hide-lg">{clock}</span>
+      {auth && (
+        <span className="badge role-badge" title="signed-in role"
+          style={{ color: auth.role === "govt" ? "var(--good)" : "var(--accent)",
+                   borderColor: auth.role === "govt" ? "#2c6b46" : "#2b5688" }}>
+          <Icon name={auth.role === "govt" ? "building" : "shield"} size={12} />
+          <span className="hide-sm">{auth.role === "govt" ? "GOVT" : (scopeName || auth.name)}</span>
+        </span>
+      )}
       <span className={"badge " + (isLive() ? "live" : "demo")}>
-        {isLive() ? "● LIVE" : "● DEMO (offline)"}
+        <span className="live-dot" /> {isLive() ? "LIVE" : "DEMO"}
       </span>
+      {auth && <button className="icon-btn" onClick={onLogout} title="sign out">
+        <Icon name="logout" size={16} />
+      </button>}
     </header>
   );
 }

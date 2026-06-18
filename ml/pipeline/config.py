@@ -174,6 +174,18 @@ HABITUAL_SHARE_THRESHOLD = 0.30   # zone repeat-share above this -> "habitual"
 OFFENDER_TOP_N = 200            # most-ticketed repeat vehicles to log
 OFFENDER_TIMELINE_CAP = 60      # most-recent tickets kept per vehicle timeline
 
+# --------------------------------------------------------------------------- #
+# TIME LENS + STAFFING (daily.json + officer-demand estimator)
+# --------------------------------------------------------------------------- #
+# Per-zone daily series is emitted for P1–P3 zones only (P4 is low-value, keeps
+# the artifact lean). City + station daily totals are emitted in full.
+DAILY_PER_ZONE_TIERS = {"P1", "P2", "P3"}
+# Officer-demand heuristic (transparent, user-tunable in the UI). One officer
+# effectively handles ~this many enforcement actions per active hour; a default
+# patrol shift is this many hours. officers ≈ expected_tickets / (rate × hours).
+TICKETS_PER_OFFICER_HOUR = 4.0
+DEFAULT_SHIFT_HOURS = 8
+
 # 7.3 responsiveness — monthly trend over Nov->Mar
 RESPONSIVENESS_MONTHS = ["2023-11", "2023-12", "2024-01", "2024-02", "2024-03"]
 RESPONDING_SLOPE = -0.05   # normalized monthly slope below -> "responding"

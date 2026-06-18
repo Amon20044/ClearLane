@@ -1,23 +1,49 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
-import { tierColor, HOURS } from "../lib/format.js";
+import { tierColor } from "../lib/format.js";
 
-export default function TimingGap({ onSelect }) {
+export default function TimingGap({ onSelect, stationName = null, zones = [] }) {
   const [data, setData] = useState(null);
-  useEffect(() => { api("/api/timing-gap").then(setData).catch(console.error); }, []);
-  if (!data) return <div className="panel">Loading…</div>;
+  useEffect(() => {
+    if (stationName) return;   // station mode is computed locally from scoped zones
+    api("/api/timing-gap").then(setData).catch(console.error);
+  }, [stationName]);
 
-  const h = data.timing.hourly_histogram;
-  const max = Math.max(...h);
-  const blind = data.blind_spots;
+  // Station mode: build this area's own hourly histogram + timing stats from the
+  // per-zone hourly arrays in the (scoped) payload — truly area-specific.
+  const local = useMemo(() => {
+    if (!stationName) return null;
+    const h = new Array(24).fill(0);
+    zones.forEach((z) => (z.hourly || []).forEach((v, i) => { h[i] += v || 0; }));
+    const total = h.reduce((a, b) => a + b, 0) || 1;
+    const peak_hour = h.indexOf(Math.max(...h));
+    const evening = h.slice(17, 21).reduce((a, b) => a + b, 0);
+    return {
+      timing: {
+        hourly_histogram: h, peak_hour,
+        evening_peak_share_pct: +(100 * evening / total).toFixed(1),
+        note: `Recorded enforcement activity for ${stationName}, by hour of day. ` +
+          `Ticket times track officer shifts, not measured traffic — the evening ` +
+          `window (17:00–21:00) is an assumed congestion peak, shown as a coverage gap.`,
+      },
+      blind_spots: zones.filter((z) => z.evening_blind_spot),
+    };
+  }, [stationName, zones]);
+
+  const view = stationName ? local : data;
+  if (!view) return <div className="panel">Loading…</div>;
+
+  const h = view.timing.hourly_histogram;
+  const max = Math.max(...h, 1);
+  const blind = view.blind_spots;
 
   return (
     <div>
       <div className="panel">
-        <h2>The enforcement-timing gap</h2>
-        <p className="sub">Enforcement peaks at {data.timing.peak_hour}:00. Only{" "}
-          <b style={{ color: "#EF9F27" }}>{data.timing.evening_peak_share_pct}%</b> of tickets fall in the
-          17:00–21:00 evening congestion window — the city's worst chronic zones go essentially unenforced
+        <h2>The enforcement-timing gap{stationName ? ` — ${stationName}` : ""}</h2>
+        <p className="sub">Enforcement peaks at {view.timing.peak_hour}:00. Only{" "}
+          <b style={{ color: "#EF9F27" }}>{view.timing.evening_peak_share_pct}%</b> of {stationName ? "this area's" : ""} tickets fall in the
+          17:00–21:00 evening congestion window — {stationName ? "this area's" : "the city's"} worst chronic zones go essentially unenforced
           exactly when congestion bites.</p>
 
         <div style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 200, marginTop: 10 }}>
@@ -36,7 +62,7 @@ export default function TimingGap({ onSelect }) {
             );
           })}
         </div>
-        <div className="note" style={{ marginTop: 12 }}>{data.timing.note}</div>
+        <div className="note" style={{ marginTop: 12 }}>{view.timing.note}</div>
       </div>
 
       <div className="panel">

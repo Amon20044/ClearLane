@@ -14,6 +14,7 @@ const DEMO = {
   "/api/evidence-points": "/demo/evidence_points.json",
   "/api/replay-frames": "/demo/replay_frames.json",
   "/api/offenders": "/demo/offenders.json",
+  "/api/daily": "/demo/daily.json",
 };
 
 let LIVE = !!BASE;
@@ -124,7 +125,8 @@ export const opPatchStatus = async (id, stateVal) => {
 // seed the offline fallback's zone index from the bundled map payload
 export const seedOpZones = (zones) =>
   localOps.setZones((zones || []).map((z) => ({
-    id: z.id, name: z.name, lat: z.lat, lon: z.lon, tier: z.tier, priority: z.priority })));
+    id: z.id, name: z.name, lat: z.lat, lon: z.lon, tier: z.tier,
+    priority: z.priority, station: z.station })));
 
 export async function copilot(body) {
   if (BASE) {

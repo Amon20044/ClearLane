@@ -119,6 +119,50 @@ def _offenders_log(ev, name_by_sid):
     return len(vehicles)
 
 
+def _daily_series(ev, z):
+    """Per-zone / per-station / city daily ticket counts over the data window.
+
+    Powers the global Time Lens (date-range filtering) and the officer-demand
+    estimator. Recorded enforcement activity by day — NOT traffic. Per-zone is
+    limited to P1–P3 tiers to keep the artifact lean (config.DAILY_PER_ZONE_TIERS)."""
+    dates = pd.date_range(C.TIME_WINDOW_START, C.TIME_WINDOW_END, freq="D")
+    dstr = [d.strftime("%Y-%m-%d") for d in dates]
+    didx = {s: i for i, s in enumerate(dstr)}
+    d = pd.to_datetime(ev["date_ist"]).dt.strftime("%Y-%m-%d")
+    keep_rows = d.isin(didx)
+    d = d[keep_rows]
+    ev = ev[keep_rows]
+    n = len(dstr)
+
+    def _series(group_key):
+        out = {}
+        for k, idxs in d.groupby(group_key, observed=True).groups.items():
+            if k is None or (isinstance(k, float) and pd.isna(k)):
+                continue
+            arr = [0] * n
+            for ds, c in d.loc[idxs].value_counts().items():
+                arr[didx[ds]] = int(c)
+            out[str(k)] = arr
+        return out
+
+    city = [0] * n
+    for ds, c in d.value_counts().items():
+        city[didx[ds]] = int(c)
+    stations = _series(ev["police_station"].values)
+    keep_zones = set(z[z["tier"].isin(C.DAILY_PER_ZONE_TIERS)]["superzone_id"].astype(str))
+    zones = {k: v for k, v in _series(ev["superzone_id"].astype(str).values).items()
+             if k in keep_zones}
+
+    U.write_json(C.DATA_PROC / "daily.json", {
+        "dates": dstr, "start": dstr[0], "end": dstr[-1],
+        "weekday0": pd.Timestamp(dstr[0]).dayofweek,   # 0=Mon, anchors dow math
+        "city": city, "stations": stations, "zones": zones,
+        "note": ("Daily ticket counts — recorded enforcement activity, not traffic. "
+                 "Per-zone series limited to P1–P3 tiers."),
+    })
+    return len(zones)
+
+
 def run():
     ev = pd.read_parquet(C.DATA_PROC / "events_clean.parquet")
     z = pd.read_parquet(C.DATA_PROC / "zone_scores.parquet")
@@ -336,12 +380,15 @@ def run():
     # ---- repeat-vehicle tracing (offenders + time-wise log) -------------- #
     n_off = _offenders_log(ev, name_by_sid)
 
+    # ---- daily series (Time Lens + officer-demand) ----------------------- #
+    n_daily = _daily_series(ev, z)
+
     # ---- optional LLM briefings (deterministic fallback always present) -- #
     _maybe_llm_briefings(z)
 
     print(f"[08_payload] map_payload ({len(map_rows)} zones), zones_detail, "
           f"{len(evidence)} evidence points, {len(emerging)} emerging, "
-          f"{n_off} repeat-vehicle logs")
+          f"{n_off} repeat-vehicle logs, daily series for {n_daily} zones")
     return kpis
 
 

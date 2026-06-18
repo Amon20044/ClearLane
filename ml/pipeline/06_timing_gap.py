@@ -85,8 +85,16 @@ def run():
         st_peak = int(hh.idxmax()) if hh.sum() else None
         st_evening = int(((st_ev["hour_ist"] >= ev_lo) & (st_ev["hour_ist"] < ev_hi)).sum())
         top = sub.sort_values("priority", ascending=False).iloc[0]
+        # station operational centre = ticket centroid; force-size proxy = distinct
+        # officers historically seen at this station (created_by_id), zone-level only.
+        st_lat = float(st_ev["latitude"].mean()) if len(st_ev) else float(sub["lat"].mean())
+        st_lon = float(st_ev["longitude"].mean()) if len(st_ev) else float(sub["lon"].mean())
+        officers_seen = int(st_ev["created_by_id"].nunique()) if len(st_ev) else 0
+        active_days = int(st_ev["date_ist"].nunique()) if len(st_ev) else 0
         stations.append({
             "station": str(st),
+            "lat": round(st_lat, 5), "lon": round(st_lon, 5),
+            "officers_seen": officers_seen, "active_days": active_days,
             "n_zones": int(len(sub)),
             "P1": int((sub["tier"] == "P1").sum()),
             "P2": int((sub["tier"] == "P2").sum()),

@@ -85,14 +85,16 @@ export default function OperationsConsole({ snapshot, onChange, onSelect }) {
         <h3>Incoming complaints</h3>
         <div className="scroll">
           <table>
-            <thead><tr><th>#</th><th>Nearest zone</th><th>Vehicle</th><th>Description</th><th>Dist.</th><th>Status</th><th>Action</th></tr></thead>
+            <thead><tr><th>#</th><th>Vehicle</th><th>Nearest zone</th><th>Station</th><th>Description</th><th>Dist.</th><th>Status</th><th>Action</th></tr></thead>
             <tbody>
-              {complaints.length === 0 && <tr><td colSpan="7" className="muted">No complaints yet — click the map on the Command view to file one.</td></tr>}
+              {complaints.length === 0 && <tr><td colSpan="8" className="muted">No complaints yet — click the map on the Command view to file one.</td></tr>}
               {complaints.map((c) => (
                 <tr key={c.id}>
                   <td className="mono">{c.id}</td>
+                  <td className="mono" style={{ color: c.vehicle_number ? "var(--accent)" : "var(--muted)" }}>
+                    {c.vehicle_number || "—"}<span className="muted" style={{ fontSize: 10 }}> {c.vehicle_type || ""}</span></td>
                   <td className="mono">{c.zone_id || "emerging point"}</td>
-                  <td>{c.vehicle_type || "—"}</td>
+                  <td style={{ fontSize: 12 }}>{c.station || "—"}</td>
                   <td style={{ fontSize: 12 }}>{c.description || "—"}</td>
                   <td className="mono">{c.distance_m != null ? `${c.distance_m}m` : "—"}</td>
                   <td>{c.status}</td>

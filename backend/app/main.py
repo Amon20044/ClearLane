@@ -76,13 +76,18 @@ app.add_middleware(
 # operational layer (additive): the live complaint -> verify -> dispatch -> clear
 # loop, persisted in SQLite. Never modifies historical ML scores.
 from . import operational  # noqa: E402
+# force-command layer (additive): RBAC auth + station/officer SQL management +
+# troop-tracking simulation. Also never modifies historical ML scores.
+from . import force  # noqa: E402
 
 app.include_router(operational.router)
+app.include_router(force.router)
 
 
 @app.on_event("startup")
 def _startup():
     operational.init_db()
+    force.init_db()
 
 
 # --------------------------------------------------------------------------- #
@@ -203,6 +208,13 @@ def offenders():
     """Repeat-vehicle tracing: most-ticketed anonymized vehicles + time-wise logs.
     Vehicle-level only (stable anonymized IDs) — never officer-level."""
     return ok(load("offenders.json"))
+
+
+@app.get("/api/daily")
+def daily():
+    """Per-zone / station / city daily ticket counts for the global Time Lens and
+    officer-demand estimator. Recorded enforcement activity by day, not traffic."""
+    return ok(load("daily.json"))
 
 
 @app.get("/api/replay-frames")

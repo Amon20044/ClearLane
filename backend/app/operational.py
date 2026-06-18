@@ -135,6 +135,10 @@ def init_db():
             escalated INTEGER DEFAULT 0, complaints INTEGER DEFAULT 0,
             updated_ts REAL);
         """)
+        # migration: add vehicle_number to older complaints tables (idempotent)
+        cols = [r[1] for r in c.execute("PRAGMA table_info(complaints)").fetchall()]
+        if "vehicle_number" not in cols:
+            c.execute("ALTER TABLE complaints ADD COLUMN vehicle_number TEXT")
 
 
 def _decayed_boost(boost, updated_ts, now):
@@ -173,6 +177,7 @@ class ComplaintIn(BaseModel):
     lon: float
     description: str = Field(default="", max_length=500)
     vehicle_type: str = Field(default="", max_length=40)
+    vehicle_number: str = Field(default="", max_length=24)
 
 
 class FeedbackIn(BaseModel):
@@ -223,6 +228,14 @@ def snapshot():
             "SELECT * FROM complaints ORDER BY created_ts DESC LIMIT 200").fetchall()]
         dispatches = [dict(r) for r in c.execute(
             "SELECT * FROM dispatches ORDER BY updated_ts DESC LIMIT 200").fetchall()]
+    # annotate each complaint/dispatch with its nearest station (from resolved zone)
+    for cc in complaints:
+        z = zi.get(cc.get("zone_id"))
+        cc["station"] = z["station"] if z else None
+    for dd in dispatches:
+        z = zi.get(dd.get("zone_id"))
+        dd["station"] = z["station"] if z else None
+        dd["zone_name"] = z["name"] if z else dd.get("zone_id")
 
     zones = []
     for s in states:
@@ -276,15 +289,18 @@ def post_complaint(body: ComplaintIn):
     now = time.time()
     with _lock, _conn() as c:
         cur = c.execute(
-            """INSERT INTO complaints(lat,lon,description,vehicle_type,zone_id,distance_m,status,created_ts)
-               VALUES(?,?,?,?,?,?,?,?)""",
-            (body.lat, body.lon, body.description, body.vehicle_type, zone_id,
+            """INSERT INTO complaints(lat,lon,description,vehicle_type,vehicle_number,zone_id,distance_m,status,created_ts)
+               VALUES(?,?,?,?,?,?,?,?,?)""",
+            (body.lat, body.lon, body.description, body.vehicle_type,
+             body.vehicle_number.upper().strip(), zone_id,
              None if zone is None else round(dist, 1), "unverified", now))
         cid = cur.lastrowid
         if zone_id:
             _bump_zone(c, zone_id, delta=OP_RULES["complaint_unverified"], add_complaint=True)
     return ok({"id": cid, "zone_id": zone_id,
                "zone_name": zone["name"] if zone else None,
+               "station": zone["station"] if zone else None,
+               "vehicle_number": body.vehicle_number.upper().strip() or None,
                "assignment": "nearest_historical_zone" if zone else "emerging_operational_point",
                "distance_m": None if zone is None else round(dist, 1), "status": "unverified"})
 

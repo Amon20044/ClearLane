@@ -22,6 +22,8 @@ into prioritized, explainable, deployable operational intelligence.
 | No closed operational loop | **Complaint → verify → dispatch → clear** workflow (separate operational layer) | Command Map, Operations Loop, Mobile dispatch |
 | Need to deploy *now*, fast | **Today's emergency board** — live weekday + hour-aware ranking (priority + forecast + historical day/hour pattern + live citizen reports), dispatch top-down. Expected enforcement-demand, *not* a congestion prediction. | Today / Emergency |
 | Same vehicles re-offend | **Repeat-vehicle tracing** — most-ticketed anonymized vehicles with a time-wise log, top zones, mini-map (single-zone repeaters → infrastructure fix). | Repeat Offenders |
+| "Show me *this* day / window, everywhere" | **Global Date Lens** — pick any calendar date (Today / Tomorrow / Pick date / Date range); re-weights the map, queues, flow-impact & staffing. In-window date = recorded; future date (e.g. 18 Jun 2025) = projected. | Date Lens bar (all views) |
+| How many officers, when? | **Officer-demand estimator** — expected ticket load for the chosen window → officers needed, tunable rate/shift, per-station. Heuristic over ticket volume, not congestion. | Staffing |
 
 ## Honesty guardrails (non-negotiable, enforced in code)
 - No fabricated congestion / speed / delay / queue / travel-time values anywhere.

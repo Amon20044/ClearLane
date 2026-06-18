@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { MapContainer, TileLayer, CircleMarker, Popup, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, CircleMarker, Popup, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import { api } from "../lib/api.js";
 import { tierColor, mapsUrl } from "../lib/format.js";
 import { reasonSentence } from "../lib/plain.js";
+import { isActive, activityField, lensLabel } from "../lib/timeLens.js";
+import MapPanel from "./MapPanel.jsx";
+import { Icon } from "./icons.jsx";
 import WhatNow from "./WhatNow.jsx";
 
 const CENTER = [12.9716, 77.5946];
@@ -30,7 +33,8 @@ function ClickToComplain({ active, onPick }) {
 }
 
 export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapshot,
-                                 onComplaint, defaultSimple = false }) {
+                                 onComplaint, defaultSimple = false,
+                                 lens = { mode: "all" }, daily = null }) {
   const [base, setBase] = useState("dark");
   const [noTiles, setNoTiles] = useState(false);
   const [simple, setSimple] = useState(defaultSimple);
@@ -42,13 +46,16 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
   const [evidence, setEvidence] = useState([]);
   const [complainMode, setComplainMode] = useState(false);
   const [pending, setPending] = useState(null); // [lat,lon] awaiting complaint form
-  const [form, setForm] = useState({ description: "", vehicle_type: "CAR" });
+  const [form, setForm] = useState({ description: "", vehicle_type: "CAR", vehicle_number: "" });
   const [toast, setToast] = useState(null);
   const [replayOn, setReplayOn] = useState(false);
   const [replay, setReplay] = useState(null);
   const [rIdx, setRIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [speed, setSpeed] = useState(900); // ms per period
+  const wide = typeof window !== "undefined" && window.innerWidth > 900;
+  const [statsOpen, setStatsOpen] = useState(wide);
+  const [legendOpen, setLegendOpen] = useState(wide);
 
   useEffect(() => {
     if (showEvidence && evidence.length === 0) {
@@ -88,12 +95,19 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
         ? flowColor(z.flow_impact)
         : tierColor(z.tier);
 
+  // Time-lens activity field (window-aware sizing/filtering).
+  const lensOn = isActive(lens) && !hourOn && !replayOn;
+  const actField = useMemo(
+    () => activityField(zones, lens, daily), [zones, lens, daily]);
+
   // Simple view → only P1/P2. Hour filter → only zones active in that hour.
+  // Time lens → only zones with activity in the selected window.
   const display = useMemo(() => {
     let d = simple ? zones.filter((z) => z.tier === "P1" || z.tier === "P2") : zones;
     if (hourOn) d = d.filter((z) => (z.hourly?.[hour] || 0) > 0);
+    if (lensOn) d = d.filter((z) => (actField.vals[z.id] || 0) > 0);
     return d;
-  }, [zones, simple, hourOn, hour]);
+  }, [zones, simple, hourOn, hour, lensOn, actField]);
 
   const hourMax = useMemo(() => {
     if (!hourOn) return 1;
@@ -103,21 +117,33 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
 
   const radius = (z) => {
     if (hourOn) return 3 + ((z.hourly?.[hour] || 0) / hourMax) * 15;
+    if (lensOn) return 3 + ((actField.vals[z.id] || 0) / actField.max) * 16;
     const base = 4 + (z.pressure / 100) * 11;
     return simple ? base + 4 : base;
   };
 
   const complaints = snapshot?.complaints || [];
   const liveZones = snapshot?.zones || [];
+  const deployedByStation = useMemo(() => {
+    const m = {};
+    for (const d of (snapshot?.dispatches || [])) {
+      if (["cleared", "structural_escalation"].includes(d.state)) continue;
+      if (d.station) m[d.station] = (m[d.station] || 0) + 1;
+    }
+    return m;
+  }, [snapshot]);
 
   async function submitComplaint() {
     try {
       const r = await onComplaint({ lat: pending[0], lon: pending[1], ...form });
-      setToast(`Complaint filed → ${r.zone_name || "emerging point"} (${r.assignment.replace(/_/g, " ")})`);
+      const veh = form.vehicle_number ? `${form.vehicle_number.toUpperCase()} · ` : "";
+      const stn = r.station ? ` · ${r.station} station` : "";
+      setToast(`Complaint filed → ${veh}${r.zone_name || "emerging point"}${stn}`);
     } catch (e) {
       setToast(`Rejected: ${e.message}`);
     }
     setPending(null); setComplainMode(false);
+    setForm({ description: "", vehicle_type: "CAR", vehicle_number: "" });
     setTimeout(() => setToast(null), 4000);
   }
 
@@ -125,45 +151,55 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
     <>
       {!hourOn && !replayOn && <WhatNow zones={zones} opByZone={opByZone} onSelect={onSelect} />}
 
-      <div className="layer-toggles">
+      <MapPanel title="Map layers &amp; view" icon="layers" pos="tl">
+        <div className="map-sec-label">View mode</div>
         <label className="toggle" style={{ borderColor: "var(--accent)" }}>
           <input type="checkbox" checked={simple}
-          onChange={(e) => setSimple(e.target.checked)} /> Simple view</label>
+          onChange={(e) => setSimple(e.target.checked)} /> Simple view (P1 / P2 only)</label>
         <label className="toggle"><input type="checkbox" checked={hourOn}
-          onChange={(e) => setHourOn(e.target.checked)} /> ⏱ Hour-of-day</label>
+          onChange={(e) => setHourOn(e.target.checked)} /> Hour-of-day activity</label>
         <label className="toggle"><input type="checkbox" checked={complainMode}
           onChange={(e) => { setComplainMode(e.target.checked); setPending(null); }} />
-          📍 File complaint (click map)</label>
+          File complaint (click map)</label>
         {!simple && <>
+          <div className="map-sec-label">Overlays</div>
           <label className="toggle"><input type="checkbox" checked={showRings}
             onChange={(e) => setShowRings(e.target.checked)} /> Evening blind-spot rings</label>
           <label className="toggle"><input type="checkbox" checked={showEvidence}
             onChange={(e) => setShowEvidence(e.target.checked)} /> Evidence points</label>
-          <label className="toggle">Color:
-            <select value={colorMode} onChange={(e) => setColorMode(e.target.value)}
-              style={{ marginLeft: 4, background: "transparent", color: "inherit", border: "none" }}>
-              <option value="tier">tier</option>
-              <option value="typology">typology</option>
-              <option value="flow_impact">flow impact</option>
-            </select></label>
           <label className="toggle"><input type="checkbox" checked={replayOn}
-            onChange={(e) => { setReplayOn(e.target.checked); setPlaying(e.target.checked); }} /> ▶ Historical replay</label>
+            onChange={(e) => { setReplayOn(e.target.checked); setPlaying(e.target.checked); }} /> Historical replay</label>
+          <div className="map-sec-label">Color zones by</div>
+          <label className="toggle">
+            <select value={colorMode} onChange={(e) => setColorMode(e.target.value)}
+              style={{ flex: 1, background: "transparent", color: "inherit", border: "none" }}>
+              <option value="tier">Priority tier</option>
+              <option value="typology">Typology cluster</option>
+              <option value="flow_impact">Flow impact</option>
+            </select></label>
         </>}
+        <div className="map-sec-label">Base map</div>
         <select className="searchbox" value={noTiles ? "plain" : base}
           onChange={(e) => { if (e.target.value === "plain") setNoTiles(true); else { setNoTiles(false); setBase(e.target.value); } }}
-          style={{ width: "auto" }}>
-          <option value="dark">Dark</option><option value="light">Light</option>
-          <option value="osm">OSM</option><option value="plain">Plain (offline)</option>
+          style={{ width: "100%" }}>
+          <option value="dark">Dark (satellite-style)</option><option value="light">Light</option>
+          <option value="osm">OpenStreetMap</option><option value="plain">Plain (offline)</option>
         </select>
-      </div>
+      </MapPanel>
 
-      <div className="map-overlay stats">
-        <div className="mono" style={{ fontSize: 22, fontWeight: 800 }}>{display.length}</div>
-        <div className="muted" style={{ fontSize: 11 }}>{hourOn ? `zones active at ${String(hour).padStart(2, "0")}:00` : "zones shown"}</div>
-        <div style={{ marginTop: 6, fontSize: 11 }}>
-          P1 {display.filter((z) => z.tier === "P1").length} · blind {display.filter((z) => z.evening_blind_spot).length}
-        </div>
-        {liveZones.length > 0 && <div style={{ marginTop: 4, fontSize: 11, color: "#EF9F27" }}>⚑ {liveZones.length} live ops</div>}
+      <div className={"map-overlay stats collapsible" + (statsOpen ? " open" : "")}>
+        <button className="ov-head" onClick={() => setStatsOpen((o) => !o)}>
+          <span className="mono ov-big">{display.length}</span>
+          <span className="ov-cap">{hourOn ? `@ ${String(hour).padStart(2, "0")}:00` : "zones shown"}</span>
+          <span className="ov-chev"><Icon name="chevron" size={14} /></span>
+        </button>
+        <div className="ov-body"><div className="ov-inner">
+          <div style={{ fontSize: 11 }}>
+            P1 {display.filter((z) => z.tier === "P1").length} · blind {display.filter((z) => z.evening_blind_spot).length}
+          </div>
+          {liveZones.length > 0 && <div style={{ marginTop: 4, fontSize: 11, color: "#EF9F27" }}>⚑ {liveZones.length} live ops</div>}
+          {lensOn && <div style={{ marginTop: 4, fontSize: 10, color: "var(--accent)" }}>📅 {lensLabel(lens, daily)} · size = expected activity</div>}
+        </div></div>
       </div>
 
       {complainMode && !pending && (
@@ -177,6 +213,9 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
         <div className="map-overlay" style={{ top: 60, left: "50%", transform: "translateX(-50%)", zIndex: 1200, width: 280 }}>
           <b>New complaint</b>
           <div className="mono muted" style={{ fontSize: 11 }}>{pending[0].toFixed(5)}, {pending[1].toFixed(5)}</div>
+          <input className="searchbox mono" style={{ width: "100%", margin: "6px 0 0", textTransform: "uppercase" }}
+            placeholder="vehicle number (e.g. KA01AB1234)"
+            value={form.vehicle_number} onChange={(e) => setForm({ ...form, vehicle_number: e.target.value })} />
           <input className="searchbox" style={{ width: "100%", margin: "6px 0" }} placeholder="description"
             value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           <select className="searchbox" style={{ width: "100%" }} value={form.vehicle_type}
@@ -226,7 +265,12 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
         </div>
       )}
 
-      <div className="map-overlay legend">
+      <div className={"map-overlay legend collapsible" + (legendOpen ? " open" : "")}>
+        <button className="ov-head" onClick={() => setLegendOpen((o) => !o)}>
+          <span className="ov-cap"><b>Legend</b></span>
+          <span className="ov-chev"><Icon name="chevron" size={14} /></span>
+        </button>
+        <div className="ov-body"><div className="ov-inner">
         {colorMode === "tier" &&
           ["P1", "P2", "P3", "P4"].map((t) => (
             <div className="row" key={t}><span className="dot" style={{ background: tierColor(t) }} /> {t}</div>))}
@@ -243,6 +287,7 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
         )}
         {liveZones.length > 0 && <div className="row" style={{ marginTop: 4 }}><span className="dot op-pulse" style={{ background: "#4aa3ff" }} /> live complaint / ops</div>}
         <div className="row muted" style={{ marginTop: 6, fontSize: 10 }}>size = obstruction pressure</div>
+        </div></div>
       </div>
 
       <MapContainer center={CENTER} zoom={12} preferCanvas>
@@ -310,8 +355,17 @@ export default function LiveMap({ zones, flyTo, onSelect, opByZone = {}, snapsho
           <CircleMarker key={"c" + c.id} center={[c.lat, c.lon]} radius={6}
             pathOptions={{ color: "#4aa3ff", weight: 2, fillColor: "#4aa3ff",
               fillOpacity: 0.5, className: "op-pulse" }}>
-            <Popup><b>Complaint #{c.id}</b><br />{c.vehicle_type || "—"} · {c.description || "no description"}<br />
-              status: {c.status}</Popup>
+            {c.vehicle_number && (
+              <Tooltip permanent direction="top" offset={[0, -6]} className="veh-tag">
+                {c.vehicle_number}</Tooltip>
+            )}
+            <Popup>
+              <b>Complaint #{c.id}</b>{c.vehicle_number && <> · <span className="mono">{c.vehicle_number}</span></>}<br />
+              {c.vehicle_type || "—"} · {c.description || "no description"}<br />
+              {c.station && <>nearest station: <b>{c.station}</b>
+                {deployedByStation[c.station] ? ` · ${deployedByStation[c.station]} on duty` : ""}<br /></>}
+              status: {c.status}
+            </Popup>
           </CircleMarker>
         ))}
       </MapContainer>

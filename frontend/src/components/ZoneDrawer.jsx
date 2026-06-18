@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { api, opDispatch, opFeedback } from "../lib/api.js";
 import { tierColor, mapsUrl, MONTHS, MONTH_LABEL } from "../lib/format.js";
-import { km } from "../lib/plain.js";
+import { km, haversine } from "../lib/plain.js";
+
+const OPEN_DONE = ["cleared", "structural_escalation"];
 
 const ROAD_CLASS_LABEL = {
   ring_road: "Ring road", arterial: "Arterial / junction", main_road: "Main road",
@@ -64,10 +66,29 @@ function Fingerprint({ grid }) {
   );
 }
 
-export default function ZoneDrawer({ id, onClose, op, onChange }) {
+export default function ZoneDrawer({ id, onClose, op, onChange, snapshot }) {
   const [z, setZ] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [stations, setStations] = useState(null);
   useEffect(() => { setZ(null); api("/api/zone/" + encodeURIComponent(id)).then(setZ).catch(console.error); }, [id]);
+  useEffect(() => { api("/api/stations").then(setStations).catch(() => {}); }, []);
+
+  // nearest station (by centroid) to this zone + troops deployed there now
+  const nearest = useMemo(() => {
+    if (!z || !stations) return null;
+    let best = null, bd = Infinity;
+    for (const s of stations) {
+      if (s.lat == null) continue;
+      const d = haversine(z.lat, z.lon, s.lat, s.lon);
+      if (d < bd) { bd = d; best = s; }
+    }
+    return best ? { ...best, dist: bd } : null;
+  }, [z, stations]);
+  const deployedHere = useMemo(() => {
+    if (!nearest || !snapshot) return 0;
+    return (snapshot.dispatches || []).filter(
+      (d) => !OPEN_DONE.includes(d.state) && d.station === nearest.station).length;
+  }, [nearest, snapshot]);
 
   const act = async (fn) => {
     setBusy(true);
@@ -132,6 +153,18 @@ export default function ZoneDrawer({ id, onClose, op, onChange }) {
               <button className="btn" disabled={busy} onClick={() => act(() => opFeedback({ zone_id: z.id, kind: "cleared" }))}>Cleared</button>
               <button className="btn" disabled={busy} onClick={() => act(() => opFeedback({ zone_id: z.id, kind: "structural_issue" }))}>Structural issue</button>
             </div>
+
+            {/* nearest station / unit to dispatch from */}
+            {nearest && (
+              <div className="note" style={{ margin: "8px 0", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span>🚓 <b>Nearest station:</b> {nearest.station} · {km(nearest.dist)} away</span>
+                {snapshot && <span style={{ color: deployedHere ? "var(--amber)" : "var(--muted)" }}>
+                  · <b>{deployedHere}</b> deployed now</span>}
+                {nearest.officers_seen != null && <span className="muted">· force ≈ {nearest.officers_seen}</span>}
+                {z.station && z.station !== nearest.station &&
+                  <span className="muted">· jurisdiction: {z.station}</span>}
+              </div>
+            )}
 
             <div style={{ display: "flex", gap: 12, alignItems: "center", margin: "6px 0 12px" }}>
               <QRCodeSVG value={mapsUrl(z.lat, z.lon)} size={84} bgColor="#11151F" fgColor="#E6EAF2" />

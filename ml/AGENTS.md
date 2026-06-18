@@ -51,7 +51,7 @@ prints a self-check table and bundles the demo artifacts.
 | 05 | `05_forecaster.py` | next-month obstruction-pressure forecaster (LightGBM) + SHAP. | `forecast.json`, `forecaster_metrics.json/.txt` |
 | 06 | `06_timing_gap.py` | enforcement-timing gap, evening blind spots, coverage curve, station command. | `timing_gap.json`, `coverage_curve.json`, `stations.json` |
 | 07 | `07_validation.py` | sensitivity (±20%, ~40 configs) + persistence backtest. | `validation.json`, `validation.txt` |
-| 08 | `08_payload.py` | build serving payloads + KPIs + optional LLM briefings + replay/hourly/weekday data + repeat-vehicle logs. | `map_payload.json` (now incl. `dow`, `forecast_score` for the Today board), `zones_detail.json`, `evidence_points.json`, `search_index.json`, `emerging.json`, `briefings.json`, `replay_frames.json`, `offenders.json` |
+| 08 | `08_payload.py` | build serving payloads + KPIs + optional LLM briefings + replay/hourly/weekday data + repeat-vehicle logs. | `map_payload.json` (now incl. `dow`, `forecast_score` for the Today board), `zones_detail.json`, `evidence_points.json`, `search_index.json`, `emerging.json`, `briefings.json`, `replay_frames.json`, `offenders.json`, `daily.json` (per-zone P1–P3 + station + city daily series for the Time Lens & staffing) |
 
 ## Scoring model (stage 03) — memorize this
 

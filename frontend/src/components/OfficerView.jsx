@@ -3,10 +3,26 @@ import { opFeedback, opComplaint } from "../lib/api.js";
 import { mapsUrl } from "../lib/format.js";
 import { reasonSentence, actionChip, urgencyColor, tierLabel, ago, km, haversine }
   from "../lib/plain.js";
+import { useRoster } from "../lib/useRoster.js";
+import { tick as forceTick, dispatchUnit, SHIFTS, shiftOnDuty } from "../lib/force.js";
 
 const CITY = [12.9716, 77.5946];
+const STATUS_LABEL = { idle: "ready at station", enroute: "en route",
+  on_site: "on site", returning: "returning", off_duty: "off duty" };
+const STATUS_COLOR = { idle: "#7fe0a0", enroute: "#378ADD", on_site: "#EF9F27",
+  returning: "#b98bff", off_duty: "#566" };
 
-export default function OfficerView({ zones, snapshot, opByZone = {}, onChange, onExit }) {
+function istHour() {
+  const d = new Date();
+  const ist = new Date(d.getTime() + (330 + d.getTimezoneOffset()) * 60000);
+  return ist.getHours();
+}
+function currentShift(hour) {
+  return Object.keys(SHIFTS).find((k) => shiftOnDuty(k, hour));
+}
+
+export default function OfficerView({ zones, snapshot, opByZone = {}, onChange, onExit,
+                                     stationName = null, stationSlug = null }) {
   const [pos, setPos] = useState(null);     // [lat,lon] or null
   const [gpsOk, setGpsOk] = useState(false);
   const [busy, setBusy] = useState(null);
@@ -36,16 +52,39 @@ export default function OfficerView({ zones, snapshot, opByZone = {}, onChange, 
 
   // A3 — reports near you
   const reports = useMemo(() => {
-    const cs = (snapshot?.complaints || []).filter((c) => c.status !== "resolved");
+    const cs = (snapshot?.complaints || []).filter((c) =>
+      c.status !== "resolved" && (!stationName || c.station === stationName));
     const withD = cs.map((c) => ({ ...c, _d: gpsOk ? haversine(here[0], here[1], c.lat, c.lon) : null }));
     if (gpsOk) withD.sort((a, b) => a._d - b._d);
     return withD.slice(0, 6);
-  }, [snapshot, gpsOk, pos]);
+  }, [snapshot, gpsOk, pos, stationName]);
 
   // A5 — plain predictions
   const rising = useMemo(
     () => zones.filter((z) => z.forecast_rising).sort((a, b) => a.rank - b.rank).slice(0, 3),
     [zones]);
+
+  // ---- station-level on-duty: roster + live patrol units (when station-scoped) ---
+  const roster = useRoster(stationSlug);
+  const hour = istHour();
+  const shift = currentShift(hour);
+  const onDutyOfficers = useMemo(
+    () => (roster.officers || []).filter((o) => shiftOnDuty(o.shift, hour)),
+    [roster.officers, hour]);
+  const problems = useMemo(() => (zones || []).map((z) => ({
+    id: z.id, name: z.name, lat: z.lat, lon: z.lon,
+    score: opByZone[z.id]?.operational_priority ?? z.priority,
+  })).sort((a, b) => b.score - a.score).slice(0, 16), [zones, opByZone]);
+  const [units, setUnits] = useState([]);
+  useEffect(() => {
+    if (!stationSlug || !roster.meta || !roster.officers.length) { setUnits([]); return; }
+    const run = () => setUnits(forceTick(stationSlug, roster.meta, roster.officers,
+      { now: Date.now(), hour: istHour(), problems }));
+    run();
+    const t = setInterval(run, 1000);
+    return () => clearInterval(t);
+  }, [stationSlug, roster.meta, roster.officers, problems]);
+  const onDutyUnits = units.filter((u) => u.status !== "off_duty");
 
   const act = async (key, fn, label) => {
     setBusy(key);
@@ -67,11 +106,66 @@ export default function OfficerView({ zones, snapshot, opByZone = {}, onChange, 
   return (
     <div className="officer">
       <header className="off-head">
-        <div><b>On Duty</b> <span className="off-loc">{gpsOk ? "📍 your location" : "📍 city centre (location off)"}</span></div>
+        <div><b>{stationName ? `${stationName} — On Duty` : "On Duty"}</b>{" "}
+          <span className="off-loc">{gpsOk ? "📍 your location" : "📍 city centre (location off)"}</span></div>
         <button className="btn" onClick={onExit}>Full dashboard →</button>
       </header>
 
       {confirm && <div className="off-confirm">{confirm}</div>}
+
+      {/* Station-level on-duty: current shift, live patrol units, on-duty officers */}
+      {stationSlug && (
+        <div className="off-station">
+          <div className="off-station-top">
+            <div>
+              <div className="off-station-name">{stationName} Station</div>
+              <div className="off-loc">
+                Shift <b>{shift}</b> · {shift && SHIFTS[shift].label} ({String(hour).padStart(2, "0")}:00 IST)
+                {" "}· {onDutyOfficers.length} officers on duty
+              </div>
+            </div>
+            <div className="off-station-counts">
+              <span style={{ color: STATUS_COLOR.idle }}>{onDutyUnits.filter((u) => u.status === "idle").length} ready</span>
+              <span style={{ color: STATUS_COLOR.enroute }}>{onDutyUnits.filter((u) => u.status === "enroute").length} en route</span>
+              <span style={{ color: STATUS_COLOR.on_site }}>{onDutyUnits.filter((u) => u.status === "on_site").length} on site</span>
+            </div>
+          </div>
+
+          <div className="off-units">
+            {onDutyUnits.length === 0 && <div className="off-empty" style={{ margin: 0 }}>No units on duty this shift.</div>}
+            {onDutyUnits.map((u) => (
+              <div className="off-unit" key={u.id} style={{ borderLeftColor: STATUS_COLOR[u.status] }}>
+                <div className="off-unit-row">
+                  <b>{u.name}</b>
+                  <span className="off-unit-state" style={{ color: STATUS_COLOR[u.status] }}>
+                    {STATUS_LABEL[u.status]}</span>
+                </div>
+                <div className="off-loc">{u.lead?.rank} {u.lead?.name} · {u.size} officers
+                  {u.zoneName ? <> → {u.zoneName}{u.etaKm != null ? ` (${u.etaKm.toFixed(1)} km)` : ""}</> : null}</div>
+                {u.status === "idle" && problems[0] && (
+                  <button className="btn" style={{ marginTop: 6 }}
+                    onClick={() => dispatchUnit(stationSlug, u.id, problems[0])}>
+                    Send to worst zone ({problems[0].name})</button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {onDutyOfficers.length > 0 && (
+            <details className="off-shift-roster">
+              <summary>On-duty officers this shift ({onDutyOfficers.length})</summary>
+              {onDutyOfficers.map((o) => (
+                <div className="off-shift-off" key={o.id}>
+                  <span className="off-rank">{rankAbbr(o.rank)}</span>
+                  <span className="off-name">{o.name}</span>
+                  <span className="muted mono off-badge">{o.badge}</span>
+                </div>
+              ))}
+            </details>
+          )}
+          <div className="off-sim-note">Patrol positions are a deployment simulation for planning — not live GPS.</div>
+        </div>
+      )}
 
       {/* A2 jobs now */}
       <h2 className="off-h">Your jobs now</h2>
@@ -158,4 +252,9 @@ export default function OfficerView({ zones, snapshot, opByZone = {}, onChange, 
       <div style={{ height: 30 }} />
     </div>
   );
+}
+
+function rankAbbr(rank) {
+  return ({ "Inspector": "INSP", "Police Sub-Inspector": "PSI",
+    "Assistant Sub-Inspector": "ASI", "Head Constable": "HC", "Constable": "PC" })[rank] || "PC";
 }

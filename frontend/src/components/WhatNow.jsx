@@ -1,4 +1,5 @@
 import { tierColor } from "../lib/format.js";
+import MapPanel from "./MapPanel.jsx";
 
 // Deterministic "next best action" from existing fields — no model call, no LLM.
 export default function WhatNow({ zones, opByZone = {}, onSelect }) {
@@ -26,19 +27,15 @@ export default function WhatNow({ zones, opByZone = {}, onSelect }) {
   const confidence = target.n_tickets >= 30 ? "high" : "medium";
 
   return (
-    <div className="map-overlay" style={{ bottom: 16, left: "50%", transform: "translateX(-50%)",
-      zIndex: 600, width: 560, maxWidth: "90vw", borderColor: "var(--accent)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <b style={{ color: "var(--accent)" }}>▸ What to do now</b>
-        <span className="muted" style={{ fontSize: 11 }}>deterministic · confidence {confidence}</span>
-      </div>
-      <div style={{ margin: "4px 0", cursor: "pointer" }} onClick={() => onSelect(target.id)}>
+    <MapPanel title="What to do now" icon="pulse" pos="br" accent badge={target.tier}>
+      <div className="whatnow-conf muted">deterministic · confidence {confidence}</div>
+      <div className="whatnow-lead" onClick={() => onSelect(target.id)}>
         Dispatch a team to <b>{target.name}</b>
         {target.station ? <span className="muted"> ({target.station})</span> : null}.{" "}
         <span style={{ fontSize: 12 }}>{target.intervention}.</span>
         {reasons.length > 0 && <span className="muted" style={{ fontSize: 12 }}> — {reasons.join(", ")}.</span>}
       </div>
-      <div style={{ display: "flex", gap: 14, fontSize: 12, alignItems: "center" }}>
+      <div className="whatnow-nums">
         <span><span className="muted">tier </span><span className="tier-pill" style={{ background: tierColor(target.tier) }}>{target.tier}</span></span>
         <span><span className="muted">historical </span><b>{op ? op.historical_priority : target.priority}</b></span>
         {op && <span style={{ color: "#EF9F27" }}>+live {op.live_adjustment}</span>}
@@ -46,6 +43,6 @@ export default function WhatNow({ zones, opByZone = {}, onSelect }) {
         {op?.dispatch_state && <span className="muted">state: {op.dispatch_state}</span>}
         <span className="mono muted">{target.lat.toFixed(4)},{target.lon.toFixed(4)}</span>
       </div>
-    </div>
+    </MapPanel>
   );
 }

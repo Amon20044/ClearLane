@@ -50,6 +50,10 @@ export function snapshot() {
     });
   }
   zones.sort((a, b) => b.operational_priority - a.operational_priority);
+  const disp = [...dispatches].reverse().map((d) => {
+    const z = idx[d.zone_id];
+    return { ...d, station: z?.station || null, zone_name: z?.name || d.zone_id };
+  });
   return {
     ts: Date.now() / 1000, offline: true,
     counts: {
@@ -57,18 +61,21 @@ export function snapshot() {
       open_dispatches: dispatches.filter((d) => !["cleared", "structural_escalation"].includes(d.state)).length,
       live_zones: zones.length, escalations: zones.filter((z) => z.escalated).length,
     },
-    zones, complaints: [...complaints].reverse(), dispatches: [...dispatches].reverse(),
+    zones, complaints: [...complaints].reverse(), dispatches: disp,
   };
 }
 
-export function postComplaint({ lat, lon, description = "", vehicle_type = "" }) {
+export function postComplaint({ lat, lon, description = "", vehicle_type = "", vehicle_number = "" }) {
   if (!inBbox(lat, lon)) throw new Error("Coordinate outside the Bengaluru bounding box.");
   const { zone, d } = nearest(lat, lon);
-  const c = { id: ++seqC, lat, lon, description, vehicle_type, zone_id: zone?.id || null,
+  const veh = (vehicle_number || "").toUpperCase().trim();
+  const c = { id: ++seqC, lat, lon, description, vehicle_type, vehicle_number: veh,
+    zone_id: zone?.id || null, station: zone?.station || null,
     distance_m: zone ? +d.toFixed(1) : null, status: "unverified", created_ts: Date.now() / 1000 };
   complaints.push(c);
   if (zone) { const s = st(zone.id); s.boost = clamp(s.boost + OP_RULES.complaint_unverified); s.complaints++; }
   return { id: c.id, zone_id: zone?.id || null, zone_name: zone?.name || null,
+    station: zone?.station || null, vehicle_number: veh || null,
     assignment: zone ? "nearest_historical_zone" : "emerging_operational_point",
     distance_m: c.distance_m, status: "unverified" };
 }

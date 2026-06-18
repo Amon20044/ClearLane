@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../lib/api.js";
 import { tierColor } from "../lib/format.js";
+import { isActive, zoneActivity, lensLabel } from "../lib/timeLens.js";
 
 // Carriageway Impact Index lens. Ranks zones by the MODELED flow-impact proxy
 // (obstruction pressure × static road-context multiplier) — explicitly NOT a
 // congestion measurement. The story is the *divergence* from strategic priority:
 // junction / arterial / metro-adjacent zones that a pure-pressure rank under-rates.
-export default function FlowImpactView({ onSelect }) {
+export default function FlowImpactView({ onSelect, lens = { mode: "all" }, daily = null }) {
   const [rows, setRows] = useState(null);
   const [sort, setSort] = useState("flow_impact_rank");
   const [dir, setDir] = useState(1);
   const [tier, setTier] = useState("");
+  const lensOn = isActive(lens);
 
   useEffect(() => { api("/api/flow-impact").then(setRows).catch(() => setRows([])); }, []);
 
@@ -25,12 +27,13 @@ export default function FlowImpactView({ onSelect }) {
   const sorted = useMemo(() => {
     if (!rows) return [];
     let r = tier ? rows.filter((z) => z.tier === tier) : rows;
-    return [...r].sort((a, b) => {
+    r = r.map((z) => ({ ...z, expected: Math.round(zoneActivity(z, lens, daily)) }));
+    return r.sort((a, b) => {
       const x = a[sort], y = b[sort];
       if (typeof x === "string") return dir * x.localeCompare(y);
       return dir * ((x ?? 0) - (y ?? 0));
     });
-  }, [rows, sort, dir, tier]);
+  }, [rows, sort, dir, tier, lens, daily]);
 
   if (!rows) return <div className="panel">Loading flow-impact lens…</div>;
 
@@ -48,6 +51,7 @@ export default function FlowImpactView({ onSelect }) {
         proximity). This is a <b>proxy for how much a block here disrupts movement</b>,
         built from static public road context — <b>not a measurement of congestion</b>
         (the data has no flow/speed signal). Click a row for the breakdown.
+        {lensOn && <> <b style={{ color: "var(--accent)" }}>Date lens: {lensLabel(lens, daily)}</b> — Expected column shows activity for that date.</>}
       </p>
 
       {movers.length > 0 && (
@@ -84,6 +88,7 @@ export default function FlowImpactView({ onSelect }) {
             <tr>
               {head("flow_impact_rank", "Flow #")}<th>Location</th>{head("tier", "Tier")}
               {head("flow_impact", "Flow impact")}{head("context_multiplier", "×context")}
+              {lensOn && head("expected", "Expected")}
               {head("priority", "Pressure-priority")}{head("rank", "Strategic #")}
               <th>Δ vs strategic</th><th>Station</th>
             </tr>
@@ -98,6 +103,7 @@ export default function FlowImpactView({ onSelect }) {
                   <td><span className="tier-pill" style={{ background: tierColor(z.tier) }}>{z.tier}</span></td>
                   <td className="mono">{z.flow_impact}</td>
                   <td className="mono">×{z.context_multiplier}</td>
+                  {lensOn && <td className="mono" style={{ color: "var(--accent)" }}>{z.expected}</td>}
                   <td>{z.priority}</td>
                   <td className="mono">{z.rank}</td>
                   <td className="mono" style={{ color: delta > 0 ? "var(--accent)" : delta < 0 ? "#5b6472" : "inherit" }}>

@@ -20,5 +20,10 @@ node_modules/
 frontend/dist/
 frontend/.env
 
-# OS
+# Secrets & runtime state
+backend/.env
+backend/data/*.db
+
+# OS / editor
 .DS_Store
+.cursor/

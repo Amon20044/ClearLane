@@ -19,29 +19,46 @@ function fmtTime(iso) {
   return d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-export default function OffendersView({ onSelect }) {
+export default function OffendersView({ onSelect, stationName = null, areaZoneIds = null }) {
   const [data, setData] = useState(null);
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(null);
   const [sort, setSort] = useState("n_tickets");
 
+  const areaSet = useMemo(
+    () => (areaZoneIds ? new Set(areaZoneIds) : null), [areaZoneIds]);
+
   useEffect(() => {
-    api("/api/offenders").then((d) => {
-      setData(d);
-      if (d?.vehicles?.length) setSel(d.vehicles[0].vehicle);
-    }).catch(() => setData({ vehicles: [], summary: {} }));
+    api("/api/offenders").then((d) => setData(d))
+      .catch(() => setData({ vehicles: [], summary: {} }));
   }, []);
 
+  // area-scoped: keep only vehicles that offend inside this station's zones, and
+  // rank them by how many of their tickets fall in the area (from top_zones).
   const list = useMemo(() => {
     if (!data) return [];
     const ql = q.toLowerCase();
     let r = data.vehicles;
+    if (areaSet) {
+      r = r.map((v) => {
+        const areaZones = (v.top_zones || []).filter((z) => areaSet.has(z.id));
+        const areaCount = areaZones.reduce((a, z) => a + (z.n || 0), 0);
+        return { ...v, _areaCount: areaCount, _areaZones: areaZones.length };
+      }).filter((v) => v._areaCount > 0);
+    }
     if (ql) r = r.filter((v) =>
       v.vehicle.toLowerCase().includes(ql) ||
       (v.vehicle_type || "").toLowerCase().includes(ql) ||
       v.top_zones.some((z) => (z.name || "").toLowerCase().includes(ql)));
-    return [...r].sort((a, b) => (b[sort] ?? 0) - (a[sort] ?? 0));
-  }, [data, q, sort]);
+    const key = areaSet
+      ? (v) => (sort === "n_zones" ? v._areaZones : v._areaCount)
+      : (v) => v[sort] ?? 0;
+    return [...r].sort((a, b) => key(b) - key(a));
+  }, [data, q, sort, areaSet]);
+
+  useEffect(() => {
+    if (list.length && !list.find((v) => v.vehicle === sel)) setSel(list[0].vehicle);
+  }, [list, sel]);
 
   const veh = useMemo(
     () => data?.vehicles.find((v) => v.vehicle === sel) || null, [data, sel]);
@@ -51,14 +68,19 @@ export default function OffendersView({ onSelect }) {
 
   return (
     <div className="panel">
-      <h2>Repeat-vehicle tracing</h2>
+      <h2>Repeat-vehicle tracing{stationName ? ` — ${stationName}` : ""}</h2>
       <p className="sub">
-        The most-ticketed vehicles, each with a time-wise log of where & when.
-        {s.pct_tickets_from_repeats != null && <> Citywide, <b>{s.pct_tickets_from_repeats}% of
-          tickets come from {s.pct_repeat_vehicles}% of vehicles.</b></>}{" "}
+        {stationName
+          ? <>Vehicles that keep offending <b>inside {stationName}'s zones</b>, ranked by
+            tickets in your area, each with a time-wise log. </>
+          : <>The most-ticketed vehicles, each with a time-wise log of where & when. </>}
+        {!stationName && s.pct_tickets_from_repeats != null && <>Citywide, <b>{s.pct_tickets_from_repeats}% of
+          tickets come from {s.pct_repeat_vehicles}% of vehicles.</b> </>}
         Vehicle IDs are <b>anonymized & stable — no real identities</b>. Zones the
         same vehicles return to need parking infrastructure, not just more tickets.
       </p>
+      {stationName && <p className="sub" style={{ marginTop: -4 }}>
+        <b>{list.length}</b> repeat vehicles active in this area.</p>}
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 16, minHeight: 0 }}>
         {/* ---- vehicle list ------------------------------------------------ */}
@@ -83,10 +105,12 @@ export default function OffendersView({ onSelect }) {
                 }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <b className="mono" style={{ fontSize: 12 }}>{v.vehicle}</b>
-                  <span className="mono" style={{ color: "var(--accent)" }}>{v.n_tickets}×</span>
+                  <span className="mono" style={{ color: "var(--accent)" }}>
+                    {areaSet ? `${v._areaCount}× here` : `${v.n_tickets}×`}</span>
                 </div>
                 <div className="muted" style={{ fontSize: 11 }}>
-                  {v.vehicle_type || "—"} · {v.n_zones} zone{v.n_zones > 1 ? "s" : ""} · last {fmtDate(v.last)}
+                  {v.vehicle_type || "—"} · {areaSet ? `${v._areaZones} area zone${v._areaZones > 1 ? "s" : ""} · ${v.n_tickets}× total`
+                    : `${v.n_zones} zone${v.n_zones > 1 ? "s" : ""}`} · last {fmtDate(v.last)}
                 </div>
               </div>
             ))}

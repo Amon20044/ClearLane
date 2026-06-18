@@ -48,9 +48,15 @@ is a judging-safety requirement.
   - `#/dispatch/{id}` → standalone mobile `Dispatch` screen;
   - `#/officer` (or any phone-width screen unless `#/dashboard`) → `OfficerView`;
   - otherwise the full dashboard with the nav `VIEWS`.
-- `VIEWS` = Command Map, Today / Emergency, Priority Queue, Flow Impact,
+- `VIEWS` = Command Map, Today / Emergency, Priority Queue, Flow Impact, Staffing,
   Repeat Offenders, Operations Loop, Timing Gap, Coverage/ROI, Forecast, Typology,
   Station Command, Methodology & Validation.
+- A **global Time Lens** (`lens` state + `daily` series in `App`, `lib/timeLens.js`,
+  `TimeLensBar.jsx`) re-weights the map, Priority Queue, Flow Impact and Staffing to
+  a chosen **calendar date** (or range). A date inside the data window shows
+  recorded activity; a future date (e.g. 18 Jun 2025) projects expected
+  enforcement-demand from that date's weekday × hour pattern — **never measured
+  congestion**. Lens shape: `{mode:'all'|'date'|'range', date, hour, start, end}`.
 
 ## Components (`src/components/`)
 
@@ -58,11 +64,13 @@ is a judging-safety requirement.
 |------|------|
 | `Header.jsx` | KPIs, search, sync/last-sync, About, Judge Tour, On-Duty toggle |
 | `KpiStrip.jsx` | headline KPIs + quick-filters (P1, chronic, blind-spot, emerging, rising) + live-ops counts |
-| `LiveMap.jsx` | leaflet command map; Simple-view toggle, hour-of-day slider, historical replay timeline, click-to-complaint |
+| `LiveMap.jsx` | leaflet command map; Simple-view toggle, hour-of-day slider, replay timeline, click-to-complaint (captures **vehicle number**, shown as a live tag + nearest station on the point) |
 | `PriorityTable.jsx` | ranked queue (shows operational priority when live) |
 | `FlowImpactView.jsx` | Carriageway Impact lens — ranked by modeled flow-impact proxy; highlights movers vs strategic rank |
 | `TodayBoard.jsx` | live weekday+hour-aware emergency board (expected activity = priority + forecast + day/hour pattern + live reports); auto-refreshes, dispatch inline. **Expected enforcement-demand, not congestion.** |
 | `OffendersView.jsx` | repeat-vehicle tracing — searchable vehicle list + per-vehicle time-wise log, top zones, mini-map. Anonymized IDs only. |
+| `TimeLensBar.jsx` | **global** date/prediction control — **pick any calendar date** (Today / Tomorrow / Pick date / Date range) lifted to `App`; re-weights map, queues, flow-impact, staffing. In-window date = recorded; future date = projected via that date's weekday × hour pattern. |
+| `OfficerDemand.jsx` | Staffing view — expected load → officers **needed vs deployed-now (live dispatches) vs station force**, per nearest station; tunable heuristic, not congestion. |
 | `OperationsConsole.jsx` | the live closed-loop console (complaints/dispatches) |
 | `ZoneDrawer.jsx` | per-zone detail; bias raw→adjusted rank story; shows the 3 numbers |
 | `TimingGap.jsx` | enforcement-timing gap + evening blind spots |
@@ -80,6 +88,9 @@ is a judging-safety requirement.
 ## Libraries (`src/lib/`)
 
 - `api.js` — API + offline fallback (above). All network access goes through here.
+- `timeLens.js` — global time/prediction lens logic: window weighting
+  (`zoneActivity`, `activityField`, `adjustedScore`) + officer-demand heuristic
+  (`areaExpectedTickets`, `officersNeeded`). Honesty labels live here.
 - `localOps.js` — offline mirror of the backend operational rules.
 - `plain.js` — **plain-language translation layer** for the officer view. Maps
   tier→"Top priority", pressure→"blocks traffic constantly", responsiveness/

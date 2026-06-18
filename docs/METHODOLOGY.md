@@ -146,6 +146,17 @@ deployment priority and measure *evidence-coverage* — never a counterfactual
   as everywhere, never officer-level). Single-zone repeaters are surfaced as a
   structural-demand signal (needs infrastructure, not just repeat tickets).
 
+- **Global Date Lens.** One shared **calendar date** (or range) re-weights the map,
+  queues, flow-impact and staffing. A date inside the data window shows **recorded**
+  daily ticket counts (`daily.json`); a future date (e.g. 18 Jun 2025) **projects**
+  expected enforcement-demand by mapping that date to its weekday and applying each
+  zone's weekday × hour shares. Neither measures congestion.
+- **Officer-demand estimator.** A transparent, user-tunable planning heuristic:
+  `officers ≈ expected_tickets ÷ (rate × shift_hours)`, where expected load comes
+  from recorded (range) or projected (predictive) ticket volume. Defaults
+  (`config.py`): rate 4 tickets/officer/hour, 8-hour shift. It sizes enforcement
+  effort from ticket volume — **not** a congestion or response-time claim.
+
 ## 9. Limitations (stated plainly)
 
 - No flow/speed/delay data → no congestion measurement; the evening gap is a
