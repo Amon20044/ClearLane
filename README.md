@@ -1,0 +1,101 @@
+# ClearLane AI
+
+**Bias-corrected parking-enforcement intelligence for Bengaluru.**
+Gridlock Hackathon 2.0 · Theme 1 (PS1) — Poor visibility on parking-induced congestion.
+
+---
+
+## The honest thesis
+
+The only data available is **5 months of parking-violation tickets** (298,450 rows,
+9 Nov 2023 → 8 Apr 2024). It contains **no traffic-flow, speed, congestion or delay
+signal** — every row is a ticket an officer wrote, so a naive hotspot map just
+reproduces where police already patrol.
+
+ClearLane is the team that understood the data is *enforcement-shaped*, proved the
+bias, corrected for it, and extracted operational intelligence:
+
+- **Bias correction** — we don't just count tickets; we correct for enforcement
+  exposure (distinct officers × active days per zone).
+- **The evening blind spot** — enforcement peaks at **10am**; only **0.16%** of
+  tickets fall in the 5–9pm congestion window, so the worst chronic zones go
+  essentially unenforced exactly when congestion bites.
+- **Habitual-offender detection** — **16.7% of tickets come from 4.6% of vehicles**;
+  those zones need parking infrastructure, not more tickets.
+- **Enforcement responsiveness** — which zones are *responding* to enforcement vs
+  *resistant* (need a structural fix).
+- **A validated next-month forecaster** — LightGBM, **R² 0.76**, top-20 precision
+  **0.85**, on a *real observed* future target (violation pressure — never congestion).
+
+> We never claim to measure congestion. The evening gap is an enforcement-**coverage**
+> gap vs the city's known peaks, stated as an assumption. See `docs/METHODOLOGY.md`.
+
+---
+
+## Quick start
+
+### 1. Run the ML pipeline (regenerates every artifact)
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cd ml/pipeline && python run_all.py        # ~11s; prints a self-check vs verified targets
+```
+The raw 110 MB CSV is gitignored (over the 50 MB limit). A 500-row sample is at
+`data/raw/sample_500.csv`. Drop the full file in `data/raw/` to regenerate from scratch.
+
+### 2. Backend
+```bash
+cd backend && pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+### 3. Frontend
+```bash
+cd frontend && npm install
+cp .env.example .env          # VITE_API_BASE=http://localhost:8000
+npm run dev                   # http://localhost:5173
+```
+The dashboard **always renders** — if the backend is down it loads the bundled
+`public/demo/*.json` fallback (the badge flips to "DEMO (offline)").
+
+### One command (Docker)
+```bash
+docker compose up --build     # frontend :5173, backend :8000
+```
+
+---
+
+## What's in here
+
+| Path | What |
+|------|------|
+| `ml/pipeline/config.py` | **single source of truth** — every verified fact, weight, threshold |
+| `ml/pipeline/01..08_*.py` | clean → superzones → scores → advanced → forecaster → timing-gap → validation → payload |
+| `ml/pipeline/run_all.py` | one command; prints the **self-check table** (flags any metric >15% off) |
+| `backend/app/main.py` | FastAPI serving precomputed artifacts (NaN-safe, gzip, CORS, demo mode) |
+| `frontend/` | React + Vite + react-leaflet command center |
+| `outputs/reports/` | cleaning summary, validation, forecaster metrics (judge-facing) |
+| `docs/METHODOLOGY.md` | honesty statement, weights + rationale, validation, limitations |
+
+## Verified self-check (latest run)
+
+| metric | target | actual |
+|---|---|---|
+| clean rows | 248,374 | 248,374 |
+| superzones | 1,543 | 1,555 |
+| P1 / P2 / P3 / P4 | 151/382/250/760 | 153/378/262/762 |
+| chronic | 618 | 623 |
+| evening blind-spot | 516 | 515 |
+| emerging | 279 | 298 |
+| evening-peak share | 0.16% | 0.163% |
+| coverage top-20 / top-50 | 17.5% / 36.6% | 16.8% / 40.4% |
+| persistence Spearman | 0.79 | 0.804 |
+
+All within ±15%. Sensitivity: top-20 overlap 80–100%, Spearman 0.96. Forecaster: R² 0.76,
+Spearman 0.78, top-20 precision 0.85.
+
+## Deployment extensions (labelled, optional)
+Complaint intake, officer feedback, and the LLM **copilot** are field-rollout
+extensions behind flags — the core analytics are fully deterministic and never
+depend on a live external call. Enable the copilot with `CLEARLANE_LLM=1` + an
+Anthropic key (used at inference only, not training).

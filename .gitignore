@@ -1,0 +1,24 @@
+# Raw dataset — 110 MB, over the 50 MB upload limit. Regenerate artifacts with
+# `cd ml/pipeline && python run_all.py`. A committed 500-row sample lives at
+# data/raw/sample_500.csv.
+data/raw/jan to may police violation_anonymized791b166 (1).csv
+data/raw/*.csv
+!data/raw/sample_500.csv
+
+# Heavy processed artifacts (regenerable). The small JSON payloads + the bundled
+# frontend/public/demo/*.json ARE committed so the demo runs without the raw data.
+data/processed/events_clean.csv
+data/processed/events_clean.parquet
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / Vite
+node_modules/
+frontend/dist/
+frontend/.env
+
+# OS
+.DS_Store

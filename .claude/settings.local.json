@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/bin/pip list *)",
+      "Bash(.venv/bin/pip install *)",
+      "Bash(time ../../.venv/bin/python 01_clean.py)",
+      "Bash(../../.venv/bin/python 02_superzones.py)",
+      "Bash(../../.venv/bin/python 03_scores.py)",
+      "Bash(../../.venv/bin/python 04_advanced.py)",
+      "Bash(../../.venv/bin/python 05_forecaster.py)",
+      "Bash(../../.venv/bin/python 06_timing_gap.py)",
+      "Bash(../../.venv/bin/python *)"
+    ]
+  }
+}
