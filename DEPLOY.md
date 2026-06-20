@@ -54,11 +54,19 @@ Env var names are flexible — `MONGODB_URI`, `MONGO_URL`, `MONGOURI` and
 
 ## 3. Configure the Vercel project
 
-Import the repo in Vercel. The settings come from `vercel.json` automatically:
+Import the repo in Vercel. **Leave the Framework Preset as "Other" and don't set a
+Build Command / Output Directory** — `vercel.json` drives everything via two
+explicit builders:
 
-- **Build Command:** `npm run build --prefix frontend`
-- **Output Directory:** `frontend/dist`
-- **Install Command:** `npm install --prefix frontend`
+- `@vercel/static-build` builds the Vite app (`frontend/` → `frontend/dist`).
+- `@vercel/python` turns `api/index.py` into the serverless API (with `backend/`
+  force-included via `includeFiles`).
+- `routes` send `/api/*` to the function and serve everything else as static files.
+
+> Why `builds` instead of a custom Build Command? With a custom build command
+> Vercel stops auto-detecting `api/*.py` as functions (you'd get *"the pattern
+> api/index.py doesn't match any Serverless Functions"*). Declaring both builders
+> explicitly is the reliable pattern for a static frontend + Python API in one repo.
 
 Add **Environment Variables** (Production + Preview):
 
