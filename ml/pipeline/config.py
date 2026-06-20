@@ -11,6 +11,7 @@ against the 298,450-row raw file. Do not contradict them anywhere in the code.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 # --------------------------------------------------------------------------- #
@@ -23,7 +24,28 @@ DATA_PROC = REPO_ROOT / "data" / "processed"
 REPORTS = REPO_ROOT / "outputs" / "reports"
 DEMO_DIR = REPO_ROOT / "frontend" / "public" / "demo"
 
-RAW_CSV = DATA_RAW / "jan to may police violation_anonymized791b166 (1).csv"
+def _resolve_raw_csv() -> Path:
+    """Locate the raw enforcement CSV.
+
+    Override with CLEARLANE_RAW_CSV (e.g. point at data/raw/sample_500.csv for a
+    fast dev check). Otherwise prefer the exact vendor name, then fall back to the
+    largest non-sample CSV in data/raw (the file has been renamed at least once).
+    """
+    env = os.environ.get("CLEARLANE_RAW_CSV")
+    if env and Path(env).exists():
+        return Path(env)
+    import glob
+    exact = DATA_RAW / "jan to may police violation_anonymized791b166 (1).csv"
+    if exact.exists():
+        return exact
+    cands = [Path(p) for p in glob.glob(str(DATA_RAW / "*.csv"))
+             if "sample" not in Path(p).name.lower()]
+    if cands:
+        return max(cands, key=lambda p: p.stat().st_size)
+    return exact
+
+
+RAW_CSV = _resolve_raw_csv()
 
 for _d in (DATA_PROC, REPORTS, DEMO_DIR):
     _d.mkdir(parents=True, exist_ok=True)
@@ -280,3 +302,91 @@ DEMO_ANCHORS = [
     "KR Market", "Safina Plaza", "Elite", "Sagar Theatre",
     "Central Street", "Subbanna", "Modi Bridge", "Hosahalli Metro", "Anand Rao",
 ]
+
+# =========================================================================== #
+# MULTI-MODEL EXTENSION (count forecaster + blind-spot PU + dispatch reranker +
+# Mappls enrichment). All ADDITIVE — none of these change the 13 self-check
+# metrics above (pillars, tiers, chronic, evening_blind_spot, coverage, backtest
+# all stay byte-identical). New columns/artifacts only.
+# =========================================================================== #
+
+# --- offence_code -> severity (AUXILIARY only; never feeds event_weight) ----- #
+# Verified against the EDA: codes mirror the violation labels. Used as a forecast
+# feature + display, NOT in the scored event_weight (which keeps using
+# SEVERITY_WEIGHTS so Pillar A / tiers are unchanged).
+OFFENCE_CODE_SEVERITY = {
+    "107": 1.00,   # PARKING IN A MAIN ROAD
+    "104": 0.90,   # PARKING NEAR ROAD CROSSING
+    "109": 0.85,   # DOUBLE PARKING
+    "111": 0.70,   # PARKING NEAR BUSTOP/SCHOOL/HOSPITAL
+    "112": 0.50,   # WRONG PARKING
+    "113": 0.45,   # NO PARKING
+    "105": 0.25,   # PARKING ON FOOTPATH
+}
+
+# --- zone x time panel (M1/M2 context) -------------------------------------- #
+# Hour bands (IST) + day types. Buckets keep the panel small + interpretable and
+# match the strongest EDA association (hour_band x weekday = 0.449).
+HOUR_BANDS = [
+    ("night", 0, 6), ("morning", 6, 11), ("midday", 11, 16),
+    ("evening", 16, 21), ("late", 21, 24),
+]
+DAY_TYPES = ["weekday", "weekend"]
+
+# --- M1 count forecaster (Poisson) ------------------------------------------ #
+# Target switches to a true COUNT (tickets in FORECAST_TARGET_MONTHS) with a
+# Poisson objective; forecast_pressure is derived from the predicted count so the
+# downstream payload/UI keep working.
+FORECAST_POISSON = True
+FORECAST_LGBM_PARAMS = {
+    "objective": "poisson", "n_estimators": 500, "learning_rate": 0.03,
+    "num_leaves": 31, "subsample": 0.8, "colsample_bytree": 0.8, "min_child_samples": 20,
+}
+FORECAST_CATBOOST = True            # train a CatBoost Poisson challenger if installed
+
+# --- M2 blind-spot / under-observation ranker (positive-unlabeled) ---------- #
+# Context-residual PU: predict pressure from CONTEXT-only features (no history);
+# the positive residual (context says risky, but few tickets) = under-observed.
+PU_CONTEXT_FEATURES = [
+    "lat", "lon", "cii_junction", "cii_road", "cii_demand", "context_multiplier",
+    "n_junctions", "poi_metro_m", "poi_bus_m", "poi_school_m", "poi_hospital_m",
+    "poi_market_m", "poi_parking_m", "reach_km",
+]
+PU_RANDOM_STATE = 42
+PU_FLAG_TOP_DECILE = 0.90            # under_observed_score percentile -> blind_spot_ml
+
+# --- M4 dispatch reranker (transparent linear) ------------------------------ #
+# dispatch_priority = 100 * normalized weighted blend. live_delay defaults to 0
+# offline and is filled at serving from the Mappls ETA delta proxy.
+RERANK_WEIGHTS = {
+    "forecast": 0.30, "pressure": 0.25, "under_observed": 0.15,
+    "live_delay": 0.20, "reachability": 0.10,
+}
+RERANK_REASON_TOP_N = 3
+# Phase-2 learn-to-rank challenger (graded relevance = realized pressure qu=bins).
+RERANK_LAMBDARANK = True
+RERANK_RELEVANCE_BINS = 5
+
+# --- M5 contextual bandit (dispatch exploration, serving) ------------------- #
+BANDIT_ALPHA = 0.6                   # LinUCB exploration coefficient
+BANDIT_REWARD = {                    # officer-feedback -> reward
+    "verified_obstruction": 1.0, "needs_towing": 1.0, "action_taken": 0.8,
+    "cleared": 0.6, "no_obstruction": 0.0, "false_alarm": 0.0, "structural_issue": 0.5,
+}
+
+# --- Mappls enrichment ------------------------------------------------------ #
+# Offline-first: every Mappls result is cached to disk so re-runs are
+# deterministic and the pipeline/demo work with NO network or key. The live ETA
+# delta proxy is a clearly-labelled serving enhancement, never measured congestion.
+MAPPLS_ENABLED = True                # set False to force pure-offline defaults
+MAPPLS_API_KEY_ENV = "MYMAPINDIA_API_KEY"
+MAPPLS_CACHE_DIR = DATA_PROC / "mappls_cache"
+MAPPLS_TIMEOUT_S = 6
+MAPPLS_COORD_DECIMALS = 4            # cache key precision (~11 m) -> reproducible
+# POI categories enriched per zone (keyword -> Mappls Nearby keyword + radius m).
+MAPPLS_POI = {
+    "metro": ("metro station", 1500), "bus": ("bus stop", 800),
+    "school": ("school", 800), "hospital": ("hospital", 1200),
+    "market": ("market", 1000), "parking": ("parking", 800),
+}
+MAPPLS_POI_FAR_M = 5000.0            # sentinel distance when nothing found / offline

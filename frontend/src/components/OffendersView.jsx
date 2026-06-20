@@ -82,7 +82,7 @@ export default function OffendersView({ onSelect, stationName = null, areaZoneId
       {stationName && <p className="sub" style={{ marginTop: -4 }}>
         <b>{list.length}</b> repeat vehicles active in this area.</p>}
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(240px, 320px) 1fr", gap: 16, minHeight: 0 }}>
+      <div className="split">
         {/* ---- vehicle list ------------------------------------------------ */}
         <div style={{ minWidth: 0 }}>
           <input className="searchbox" style={{ width: "100%", marginBottom: 6 }}
@@ -95,7 +95,7 @@ export default function OffendersView({ onSelect, stationName = null, areaZoneId
                 style={{ fontSize: 11, padding: "1px 8px" }} onClick={() => setSort(k)}>{l}</button>
             ))}
           </div>
-          <div className="scroll" style={{ maxHeight: "62vh" }}>
+          <div className="scroll offender-list" style={{ maxHeight: "62vh" }}>
             {list.map((v) => (
               <div key={v.vehicle} onClick={() => setSel(v.vehicle)}
                 style={{

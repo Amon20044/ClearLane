@@ -1,0 +1,25 @@
+name: Dispatch rerank (5-min cron)
+
+# Free 5-minute trigger for the live-rerank snapshot, since Vercel Hobby crons are
+# limited to once/day. Hits the deployed recalc endpoint, which pulls current
+# Mappls ETA deltas, re-blends dispatch_priority, and stores the snapshot in Mongo.
+# (GitHub's scheduler runs roughly every 5 min; it can lag a few minutes under load.)
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}        # allows manual "Run workflow" from the Actions tab
+
+# avoid overlapping runs piling up if one is slow
+concurrency:
+  group: dispatch-rerank
+  cancel-in-progress: true
+
+jobs:
+  rerank:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger /api/dispatch/recalc
+        run: |
+          curl -fsS "https://clearlane-arisyn.vercel.app/api/dispatch/recalc?limit=80" \
+            -o /dev/null -w "recalc HTTP %{http_code} in %{time_total}s\n"

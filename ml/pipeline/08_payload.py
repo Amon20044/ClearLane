@@ -206,6 +206,7 @@ def run():
         "emerging": int(z["emerging"].sum()),
         "forecast_rising": int(z["forecast_rising"].sum()),
         "habitual": int(z["habitual"].sum()),
+        "blind_spot_ml": int(z["blind_spot_ml"].sum()) if "blind_spot_ml" in z.columns else 0,
         "total_events": int(len(ev)),
         "data_window": C.TIME_WINDOW_LABEL,
     }
@@ -235,6 +236,16 @@ def run():
             "flow_impact_rank": int(r["flow_impact_rank"]),
             "context_multiplier": round(float(r["context_multiplier"]), 2),
             "forecast_score": round(float(r["forecast_score"]), 1),
+            # --- multi-model extension fields ---------------------------- #
+            "count_pred": round(float(r.get("forecast_count", 0) or 0), 1),
+            "under_observed": round(float(r.get("under_observed_score", 0) or 0), 1),
+            "blind_spot_ml": bool(r.get("blind_spot_ml", False)),
+            "assoc_score": None,   # live-filled by the backend (Mappls ETA delta proxy)
+            "dispatch_priority": round(float(r.get("dispatch_priority", 0) or 0), 1),
+            "dispatch_rank": int(r.get("dispatch_rank", 0) or 0),
+            "reason_codes": (str(r["reason_codes"]).split("|")
+                             if isinstance(r.get("reason_codes"), str) and r.get("reason_codes")
+                             else []),
             # compact hour-of-day + weekday histograms (recorded enforcement
             # activity, NOT traffic). Used by the "Today" emergency board.
             "hourly": [int(v) for v in hourly.get(r["superzone_id"], [0] * 24)],
@@ -280,8 +291,17 @@ def run():
             "evening_share": round(float(r["evening_share"]), 4),
             "evening_blind_spot": bool(r["evening_blind_spot"]),
             "forecast": {"pressure": round(float(r["forecast_pressure"]), 2),
+                         "count": round(float(r.get("forecast_count", 0) or 0), 1),
                          "score": round(float(r["forecast_score"]), 1),
                          "rising": bool(r["forecast_rising"])},
+            "blind_spot": {"under_observed_score": round(float(r.get("under_observed_score", 0) or 0), 1),
+                           "ml_flag": bool(r.get("blind_spot_ml", False)),
+                           "context_pred": round(float(r.get("ctx_pred", 0) or 0), 1)},
+            "dispatch": {"priority": round(float(r.get("dispatch_priority", 0) or 0), 1),
+                         "rank": int(r.get("dispatch_rank", 0) or 0),
+                         "reason_codes": (str(r["reason_codes"]).split("|")
+                                          if isinstance(r.get("reason_codes"), str) and r.get("reason_codes")
+                                          else [])},
             # carriageway impact — auditable breakdown of the flow-impact proxy
             "flow_impact": {
                 "score": round(float(r["flow_impact_score"]), 1),

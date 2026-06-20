@@ -151,16 +151,24 @@ def run():
     ev = pd.read_parquet(C.DATA_PROC / "events_clean.parquet")
     z = pd.read_parquet(C.DATA_PROC / "zone_scores.parquet")
 
+    import json
     sens = _sensitivity(ev, z)
     cii = _cii_sensitivity(z)
     pers = _persistence(ev)
     try:
-        import json
         fc = json.loads((C.DATA_PROC / "forecaster_metrics.json").read_text())
     except Exception:
         fc = {}
+    try:
+        pu = json.loads((C.DATA_PROC / "pu_scores.json").read_text())
+        blind = {k: pu.get(k) for k in (
+            "method", "holdout_r2_context_to_pressure", "spearman_context_vs_observed",
+            "blind_spot_ml_count", "hidden_discovery")}
+    except Exception:
+        blind = {}
 
-    out = {"sensitivity": sens, "cii": cii, "persistence": pers, "forecaster": fc}
+    out = {"sensitivity": sens, "cii": cii, "persistence": pers,
+           "forecaster": fc, "blind_spot": blind}
     U.write_json(C.DATA_PROC / "validation.json", out)
 
     lines = ["ClearLane — validation report (stage 07)", "=" * 48, "",
@@ -170,8 +178,11 @@ def run():
     lines += [f"  {k}: {v}" for k, v in cii.items()]
     lines += ["", "PERSISTENCE BACKTEST (train Nov–Jan, test Feb–Apr):"]
     lines += [f"  {k}: {v}" for k, v in pers.items()]
-    lines += ["", "FORECASTER (held-out, real future-pressure target):"]
-    lines += [f"  {k}: {v}" for k, v in fc.items() if k != "shap_importance"]
+    lines += ["", "FORECASTER (held-out, real future-COUNT target, Poisson):"]
+    lines += [f"  {k}: {v}" for k, v in fc.items()
+              if k not in ("shap_importance", "mappls_features")]
+    lines += ["", "BLIND-SPOT PU RANKER (context-residual under-observation):"]
+    lines += [f"  {k}: {v}" for k, v in blind.items()]
     (C.REPORTS / "validation.txt").write_text("\n".join(lines) + "\n")
 
     print(f"[07_validation] sensitivity top-20 overlap "

@@ -1,21 +1,21 @@
 """
 Vercel Python serverless entry point for the ClearLane API.
 
-Vercel's @vercel/python runtime detects the module-level ASGI ``app`` and serves
-it directly (same pattern as vercel-labs/ai-sdk-preview-python-streaming). All
-``/api/*`` requests are routed here by vercel.json; the FastAPI routes already
-carry the ``/api`` prefix, so the original path matches unchanged.
+Vercel's @vercel/python runtime bundles this `api/` directory and detects the
+module-level ASGI ``app``. The whole FastAPI app lives in the self-contained
+``clearlane`` package right next to this file (no imports from outside `api/`),
+so the function bundle is complete with zero-config — no custom includeFiles.
 
-State lives in MongoDB (see backend/app/db.py) because Vercel's filesystem is
+State lives in MongoDB (see clearlane/db.py) because Vercel's filesystem is
 read-only — set MONGODB_URI / MONGODB_DB in the project's Environment Variables.
 """
 import sys
 from pathlib import Path
 
-# make the repo root importable so ``backend.app`` resolves on Vercel
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# ensure this directory is importable both on Vercel and when run locally
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from backend.app.main import app  # noqa: E402
+from clearlane.main import app  # noqa: E402
 
 # Vercel looks for a module-level ``app`` (ASGI). Keep this name.
 __all__ = ["app"]

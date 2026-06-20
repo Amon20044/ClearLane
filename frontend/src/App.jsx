@@ -26,6 +26,7 @@ import ValidationPanel from "./components/ValidationPanel.jsx";
 import ForecastView from "./components/ForecastView.jsx";
 import TypologyView from "./components/TypologyView.jsx";
 import StationView from "./components/StationView.jsx";
+import DispatchView from "./components/DispatchView.jsx";
 import Dispatch from "./components/Dispatch.jsx";
 import OperationsConsole from "./components/OperationsConsole.jsx";
 import AboutModal from "./components/AboutModal.jsx";
@@ -35,6 +36,7 @@ import OfficerView from "./components/OfficerView.jsx";
 const ANALYTICS_VIEWS = [
   ["command", "Command Map"],
   ["today", "Today / Emergency"],
+  ["dispatch", "Dispatch AI"],
   ["queue", "Priority Queue"],
   ["flow_impact", "Flow Impact"],
   ["staffing", "Staffing"],
@@ -54,6 +56,7 @@ const STATION_VIEWS = [
   ["force", "Station Command"],
   ["command", "Command Map"],
   ["today", "Today / Emergency"],
+  ["dispatch", "Dispatch AI"],
   ["queue", "Priority Queue"],
   ["offenders", "Repeat Offenders"],
   ["timing", "Timing Gap"],
@@ -63,9 +66,9 @@ const STATION_VIEWS = [
 
 // Every routable dashboard view key (union of govt + station). The active view is
 // kept in the URL hash (#/<view>) so a refresh restores the same page.
-const ALL_VIEW_KEYS = ["force", "command", "today", "queue", "flow_impact",
-  "staffing", "offenders", "operations", "timing", "coverage", "forecast",
-  "typology", "stations", "validation"];
+const ALL_VIEW_KEYS = ["force", "command", "today", "dispatch", "queue",
+  "flow_impact", "staffing", "offenders", "operations", "timing", "coverage",
+  "forecast", "typology", "stations", "validation"];
 function hashView() {
   const seg = window.location.hash.replace(/^#\/?/, "").split("/")[0];
   return ALL_VIEW_KEYS.includes(seg) ? seg : null;
@@ -227,6 +230,10 @@ export default function App() {
               <LiveMap zones={filtered} flyTo={flyTo} onSelect={(id) => openZone(id)}
                 opByZone={opByZone} snapshot={snapshot} onComplaint={submitComplaint}
                 lens={lens} daily={daily} />
+            )}
+            {view === "dispatch" && (
+              <DispatchView station={govt ? null : scopeName}
+                onSelect={(id) => openZone(id, true)} />
             )}
             {view === "queue" && (
               <PriorityTable zones={filtered} onSelect={(id) => openZone(id, true)}

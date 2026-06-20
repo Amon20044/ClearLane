@@ -42,7 +42,22 @@ export default defineConfig(({ mode }) => {
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         navigateFallback: "/index.html",
         cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         runtimeCaching: [
+          {
+            // App shell / page navigations: ALWAYS try the network first so a new
+            // deploy shows up on the next online load (no stale cached HTML →
+            // hashed assets). Falls back to the cached shell only when offline.
+            urlPattern: ({ request }) => request.mode === "navigate",
+            handler: "NetworkFirst",
+            options: {
+              cacheName: "html",
+              networkTimeoutSeconds: 3,
+              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // onboarding / login imagery — cache after first view for offline use
             urlPattern: /\/img\/.*\.(png|jpg|webp)$/i,

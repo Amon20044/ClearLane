@@ -20,9 +20,18 @@ import config as C          # noqa: E402
 
 warnings.filterwarnings("ignore")
 
+# Stage prints use Unicode (·, →, ², ≥); force UTF-8 so they don't crash on a
+# Windows cp1252 console.
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 STAGES = [
-    "01_clean", "02_superzones", "03_scores", "04_advanced",
-    "05_forecaster", "06_timing_gap", "07_validation", "08_payload",
+    "01_clean", "02_superzones", "03_scores", "04_advanced", "04b_features",
+    "05_forecaster", "06_timing_gap", "06b_blindspot", "07_validation",
+    "07b_reranker", "08_payload",
 ]
 
 # artifacts copied into the frontend demo fallback (must stay small)
@@ -32,6 +41,7 @@ DEMO_ARTIFACTS = [
     "coverage_curve.json", "stations.json", "validation.json",
     "search_index.json", "briefings.json", "offender_stat.json",
     "replay_frames.json", "offenders.json", "daily.json",
+    "pu_scores.json", "reranker_metrics.json", "forecaster_metrics.json",
 ]
 
 
