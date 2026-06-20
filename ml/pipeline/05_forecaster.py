@@ -1,16 +1,20 @@
 """
-Stage 05 — next-month hotspot forecaster (the legitimate AI/ML centerpiece).
+Stage 05 — next-month obstruction forecaster (the legitimate ML centerpiece).
 
-  Features : each zone's Nov–Jan signals (pressure, recurrence, mix, repeat
-             share, exposure, trend, typology, junction flag).
-  Target   : that zone's Feb–Mar OBSTRUCTION PRESSURE — a real, observed future
-             quantity. NOT congestion (the data has none).
-  Model    : LightGBM gradient-boosted trees.
-  Report   : R², Spearman, top-K precision (do top-predicted zones become hot?).
-  Explain  : SHAP feature importances (falls back to gain importance if needed).
+  Features : each zone's Nov-Jan signals (pressure, recurrence, mix, repeat share,
+             exposure, trend, typology, junction) PLUS Mappls context from stage
+             04b (POI distances/counts, station reachability) and the auxiliary
+             offence-code severity.
+  Target   : that zone's Feb-Mar TICKET COUNT — a real, observed future COUNT.
+             Modelled with a POISSON objective (count data). NOT congestion.
+  Models   : sklearn PoissonRegressor (GLM baseline) -> LightGBM `objective=poisson`
+             (main) -> CatBoost Poisson (challenger, if installed).
+  Holdout  : temporal design (features Nov-Jan -> target Feb-Mar) + a spatial
+             (zone) hold-out for generalization metrics.
+  Report   : Poisson deviance, R2, Spearman, top-K precision. SHAP reason codes.
 
-Framed as: "forecasts which zones stay / become high-obstruction next month,
-validated on held-out months" — never as congestion prediction.
+forecast_pressure is derived from the predicted count x the zone's weight/ticket
+so the downstream payload + UI keep working unchanged.
 """
 from __future__ import annotations
 
@@ -20,7 +24,10 @@ import sys
 import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
+from sklearn.linear_model import PoissonRegressor
+from sklearn.metrics import mean_poisson_deviance
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import config as C          # noqa: E402
@@ -33,6 +40,12 @@ except Exception:                       # pragma: no cover
     from sklearn.ensemble import GradientBoostingRegressor
     _HAS_LGB = False
 
+try:                                    # optional challenger
+    from catboost import CatBoostRegressor
+    _HAS_CAT = True
+except Exception:                       # pragma: no cover
+    _HAS_CAT = False
+
 
 def _feature_frame(ev, z):
     feat_ev = ev[ev["month_ist"].isin(C.FORECAST_FEATURE_MONTHS)]
@@ -44,8 +57,8 @@ def _feature_frame(ev, z):
     f["feat_months"] = g["month_ist"].nunique().reindex(f.index).fillna(0)
     f["feat_veh_footprint"] = g["vehicle_wt"].mean().reindex(f.index).fillna(0)
     f["feat_severity"] = g["row_severity"].mean().reindex(f.index).fillna(0)
+    f["feat_offence_sev"] = g["offence_severity_aux"].mean().reindex(f.index).fillna(0)
     f["feat_officers"] = g["created_by_id"].nunique().reindex(f.index).fillna(0)
-    # within-feature-window monthly trend
     mp = (feat_ev.groupby(["superzone_id", "month_ist"], observed=True)["event_weight"]
           .sum().unstack(fill_value=0))
     for m in C.FORECAST_FEATURE_MONTHS:
@@ -56,12 +69,32 @@ def _feature_frame(ev, z):
     f["feat_trend"] = mp.apply(
         lambda r: float(np.polyfit(xidx, r.values, 1)[0]) if r.sum() > 0 else 0.0,
         axis=1).reindex(f.index).fillna(0)
-    # carry zone attributes computed in stage 04
     zi = z.set_index("superzone_id")
     f["feat_repeat_share"] = zi["repeat_share"].reindex(f.index).fillna(0)
     f["feat_junction"] = zi["junction_anchored"].reindex(f.index).fillna(False).astype(int)
     f["feat_cluster"] = zi["cluster"].reindex(f.index).fillna(-1).astype(int)
+
+    # --- Mappls context features from stage 04b (offline -> neutral defaults) #
+    try:
+        zf = pd.read_parquet(C.DATA_PROC / "zone_features.parquet").set_index("superzone_id")
+        num = [c for c in zf.columns if c.startswith("poi_") or c == "reach_km"]
+        for c in num:
+            f[f"ctx_{c}"] = pd.to_numeric(zf[c], errors="coerce").reindex(f.index)
+        # fill: distances -> far sentinel, counts/reach -> 0/median
+        for c in num:
+            col = f"ctx_{c}"
+            if c.endswith("_m"):
+                f[col] = f[col].fillna(C.MAPPLS_POI_FAR_M)
+            else:
+                f[col] = f[col].fillna(0)
+    except Exception:
+        pass
     return f
+
+
+def _weight_per_ticket(f):
+    wpt = f["feat_pressure"] / f["feat_tickets"].replace(0, np.nan)
+    return wpt.fillna(wpt.median() if wpt.notna().any() else 0.3)
 
 
 def run():
@@ -69,48 +102,68 @@ def run():
     z = pd.read_parquet(C.DATA_PROC / "zone_scores.parquet")
 
     f = _feature_frame(ev, z)
-
-    # target: Feb–Mar obstruction pressure (real future value)
-    tgt_ev = ev[ev["month_ist"].isin(C.FORECAST_TARGET_MONTHS)]
-    target = (tgt_ev.groupby("superzone_id", observed=True)["event_weight"].sum()
-              .reindex(f.index).fillna(0))
-    y = np.log1p(target.values)              # stabilize skew
-    X = f.values
     feat_names = list(f.columns)
+    X = f.values.astype(float)
 
-    Xtr, Xte, ytr, yte, idx_tr, idx_te = train_test_split(
-        X, y, np.arange(len(X)), test_size=C.FORECAST_TEST_FRAC,
-        random_state=C.FORECAST_RANDOM_STATE)
+    # target = Feb-Mar TICKET COUNT (a real observed future count -> Poisson)
+    tgt_ev = ev[ev["month_ist"].isin(C.FORECAST_TARGET_MONTHS)]
+    y = (tgt_ev.groupby("superzone_id", observed=True)["id"].count()
+         .reindex(f.index).fillna(0).values.astype(float))
 
+    Xtr, Xte, ytr, yte = train_test_split(
+        X, y, test_size=C.FORECAST_TEST_FRAC, random_state=C.FORECAST_RANDOM_STATE)
+
+    # ---- GLM baseline (interpretable benchmark) -------------------------- #
+    sc = StandardScaler().fit(Xtr)
+    glm = PoissonRegressor(alpha=1e-3, max_iter=500).fit(sc.transform(Xtr), ytr)
+    glm_pred = np.clip(glm.predict(sc.transform(Xte)), 1e-6, None)
+    glm_dev = float(mean_poisson_deviance(yte, glm_pred))
+
+    # ---- main model: LightGBM Poisson ------------------------------------ #
     if _HAS_LGB:
-        model = lgb.LGBMRegressor(
-            n_estimators=400, learning_rate=0.03, num_leaves=31,
-            subsample=0.8, colsample_bytree=0.8,
-            random_state=C.FORECAST_RANDOM_STATE, verbose=-1)
+        params = dict(C.FORECAST_LGBM_PARAMS)
+        model = lgb.LGBMRegressor(random_state=C.FORECAST_RANDOM_STATE, verbose=-1, **params)
+        model_name = "LightGBM(poisson)"
     else:                                    # pragma: no cover
+        from sklearn.ensemble import GradientBoostingRegressor
         model = GradientBoostingRegressor(random_state=C.FORECAST_RANDOM_STATE)
+        model_name = "GradientBoosting"
     model.fit(Xtr, ytr)
+    pred_te = np.clip(model.predict(Xte), 1e-6, None)
 
-    pred_te = model.predict(Xte)
+    poisson_dev = float(mean_poisson_deviance(yte, pred_te))
     ss_res = float(np.sum((yte - pred_te) ** 2))
     ss_tot = float(np.sum((yte - yte.mean()) ** 2))
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
     rho = float(spearmanr(yte, pred_te).statistic)
-
-    # top-K precision on the held-out set: do top-predicted become top-actual?
     topk_prec = {}
     for k in (10, 20, 50):
         k = min(k, len(yte))
-        top_pred = set(np.argsort(pred_te)[-k:])
-        top_actual = set(np.argsort(yte)[-k:])
-        topk_prec[f"top{k}"] = round(len(top_pred & top_actual) / k, 3)
+        topk_prec[f"top{k}"] = round(
+            len(set(np.argsort(pred_te)[-k:]) & set(np.argsort(yte)[-k:])) / k, 3)
 
-    # full-zone predictions (predict on all zones for the dashboard layer)
-    full_pred = np.expm1(model.predict(X))
+    # ---- CatBoost Poisson challenger (optional) -------------------------- #
+    challenger = {}
+    if _HAS_CAT and C.FORECAST_CATBOOST:
+        try:                                 # pragma: no cover
+            cb = CatBoostRegressor(loss_function="Poisson", iterations=400,
+                                   learning_rate=0.05, depth=6, verbose=False,
+                                   random_seed=C.FORECAST_RANDOM_STATE)
+            cb.fit(Xtr, ytr)
+            cb_pred = np.clip(cb.predict(Xte), 1e-6, None)
+            challenger = {"model": "CatBoost(Poisson)",
+                          "poisson_deviance": round(float(mean_poisson_deviance(yte, cb_pred)), 3),
+                          "spearman": round(float(spearmanr(yte, cb_pred).statistic), 3)}
+        except Exception as e:
+            challenger = {"model": "CatBoost", "skipped": type(e).__name__}
+
+    # ---- full-zone predictions -> count + derived pressure --------------- #
+    full_count = np.clip(model.predict(X), 0, None)
+    wpt = _weight_per_ticket(f).values
     z = z.set_index("superzone_id")
-    z["forecast_pressure"] = pd.Series(full_pred, index=f.index)
+    z["forecast_count"] = pd.Series(full_count, index=f.index)
+    z["forecast_pressure"] = pd.Series(full_count * wpt, index=f.index)
     z["forecast_score"] = U.percentile_norm(z["forecast_pressure"])
-    # rising = predicted future pressure exceeds feature-window pressure (scaled)
     feat_window_months = len(C.FORECAST_FEATURE_MONTHS)
     tgt_window_months = len(C.FORECAST_TARGET_MONTHS)
     expected_flat = f["feat_pressure"].values * (tgt_window_months / feat_window_months)
@@ -118,15 +171,15 @@ def run():
     z = z.reset_index()
     z.to_parquet(C.DATA_PROC / "zone_scores.parquet", index=False)
 
-    # ---- SHAP (with graceful fallback to gain importance) ---------------- #
-    shap_summary = {}
+    # ---- SHAP (fallback to gain importance) ------------------------------ #
+    shap_summary, shap_method = {}, ""
     try:
         import shap
-        expl = shap.TreeExplainer(model)
-        sv = expl.shap_values(Xte)
+        sv = shap.TreeExplainer(model).shap_values(Xte)
         mean_abs = np.abs(sv).mean(axis=0)
-        shap_summary = {n: round(float(v), 4) for n, v in zip(feat_names, mean_abs)}
-        shap_summary = dict(sorted(shap_summary.items(), key=lambda kv: -kv[1]))
+        shap_summary = dict(sorted(
+            {n: round(float(v), 4) for n, v in zip(feat_names, mean_abs)}.items(),
+            key=lambda kv: -kv[1]))
         shap_method = "shap_tree_explainer"
     except Exception as e:                   # pragma: no cover
         imp = getattr(model, "feature_importances_", np.ones(len(feat_names)))
@@ -136,12 +189,19 @@ def run():
         shap_method = f"gain_importance_fallback ({type(e).__name__})"
 
     metrics = {
-        "model": "LightGBM" if _HAS_LGB else "GradientBoosting",
-        "target": "Feb–Mar obstruction pressure (real observed future value)",
+        "model": model_name,
+        "objective": "poisson" if (_HAS_LGB and C.FORECAST_POISSON) else "regression",
+        "target": "Feb-Mar ticket COUNT (real observed future count)",
+        "holdout": "temporal (Nov-Jan features -> Feb-Mar target) + spatial zone split",
         "n_zones": int(len(X)), "n_features": len(feat_names),
         "train_size": int(len(Xtr)), "test_size": int(len(Xte)),
+        "poisson_deviance": round(poisson_dev, 3),
         "r2": round(r2, 3), "spearman": round(rho, 3),
         "topk_precision": topk_prec,
+        "glm_baseline": {"model": "PoissonRegressor(GLM)",
+                         "poisson_deviance": round(glm_dev, 3)},
+        "challenger": challenger,
+        "mappls_features": [n for n in feat_names if n.startswith("ctx_")],
         "feature_importance_method": shap_method,
         "shap_importance": shap_summary,
         "forecast_rising_zones": int(z["forecast_rising"].sum()),
@@ -150,10 +210,12 @@ def run():
     (C.REPORTS / "forecaster_metrics.txt").write_text(
         "\n".join(f"{k}: {v}" for k, v in metrics.items()) + "\n")
 
-    print(f"[05_forecaster] {metrics['model']} R²={metrics['r2']} "
-          f"Spearman={metrics['spearman']} topK={topk_prec}")
-    print(f"[05_forecaster] top drivers: "
-          f"{list(shap_summary)[:4]}  rising={metrics['forecast_rising_zones']}")
+    print(f"[05_forecaster] {model_name} poissonDev={metrics['poisson_deviance']} "
+          f"(GLM {metrics['glm_baseline']['poisson_deviance']}) R2={r2:.3f} "
+          f"Spearman={rho:.3f} topK={topk_prec}")
+    print(f"[05_forecaster] top drivers: {list(shap_summary)[:4]} · "
+          f"rising={metrics['forecast_rising_zones']}"
+          + (f" · challenger={challenger.get('model')}" if challenger else ""))
     return metrics
 
 

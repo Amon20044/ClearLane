@@ -12,6 +12,7 @@ const MAP = {
   force: ShieldCheck,
   command: Map,
   today: Siren,
+  dispatch: Navigation,
   queue: ListOrdered,
   flow_impact: Activity,
   staffing: Users,

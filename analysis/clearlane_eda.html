@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClearLane — Column BI</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{--bg:#070A10;--panel:#111621;--line:#232c3e;--txt:#EAEEF6;--muted:#8a96ac;--accent:#3E97F0;--teal:#38E1C8}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--txt);
+    font-family:"DM Sans",Inter,system-ui,sans-serif}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;
+    background:radial-gradient(900px 500px at 12% -8%,rgba(62,151,240,.12),transparent 60%),
+    radial-gradient(800px 500px at 100% 0,rgba(56,225,200,.08),transparent 55%)}
+  header{padding:22px 26px;border-bottom:1px solid var(--line);
+    background:linear-gradient(180deg,rgba(17,22,33,.96),rgba(13,17,26,.8));backdrop-filter:blur(12px)}
+  h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.02em}
+  h1 span{color:var(--accent)}
+  .sub{color:var(--muted);font-size:13px;margin-top:4px}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .kpi{background:#161D2B;border:1px solid var(--line);border-radius:10px;padding:8px 14px}
+  .kpi b{font-size:20px;font-weight:800} .kpi span{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+  h2{font-size:15px;margin:26px 0 12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .wrap{padding:20px 26px 60px;max-width:1500px;margin:0 auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,rgba(20,26,39,.7),rgba(15,20,31,.7));
+    border:1px solid var(--line);border-radius:14px;padding:14px}
+  .card h3{margin:0 0 2px;font-size:14px} .card .meta{color:var(--muted);font-size:11px;margin-bottom:6px}
+  .card .note{color:var(--muted);font-size:11px;margin-top:8px;line-height:1.4;border-top:1px solid #1a2230;padding-top:7px}
+  .cv{height:208px;position:relative}
+  table.rel{border-collapse:collapse;font-size:12px;width:100%}
+  table.rel th,table.rel td{padding:7px 9px;text-align:center;border:1px solid #1a2230}
+  table.rel th{color:var(--muted);font-weight:600;background:#141a26;position:sticky;top:0}
+  table.rel td.k{text-align:left;color:var(--muted);background:#141a26;font-weight:600}
+  .roadmap{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .step{background:linear-gradient(180deg,rgba(20,26,39,.7),rgba(15,20,31,.7));border:1px solid var(--line);
+    border-left:3px solid var(--accent);border-radius:12px;padding:14px}
+  .step b{display:block;font-size:14px;margin-bottom:5px} .step p{margin:0;color:var(--muted);font-size:12.5px;line-height:1.5}
+  .step .tag{font-size:10px;font-weight:700;color:var(--teal);text-transform:uppercase;letter-spacing:.4px}
+  .legend{font-size:10px;color:var(--muted);margin:4px 0 0}
+</style></head>
+<body>
+<header>
+  <h1>Clear<span>Lane</span> · Column BI</h1>
+  <div class="sub" id="sub"></div>
+  <div class="kpis" id="kpis"></div>
+</header>
+<div class="wrap">
+  <h2>Time patterns (created_datetime · IST)</h2>
+  <div class="grid" id="time"></div>
+  <h2>Every column — distribution</h2>
+  <div class="grid" id="cols"></div>
+  <h2>Relationships — Cramér's V (0 = independent · 1 = strongly associated)</h2>
+  <div class="card" style="overflow:auto"><div id="rel"></div>
+    <div class="legend">What to engineer from the strong cells: any pair &gt; 0.3 is a useful interaction
+      feature (e.g. station×violation, hour-band×violation). Diagonal is self (1.0).</div></div>
+  <h2>Build roadmap — from this table to the full product</h2>
+  <div class="roadmap" id="road"></div>
+</div>
+<script>
+const D = {"meta": {"file": "jan to may police violation_anonymized791b166.csv", "rows": 298450, "columns": 24, "date_min": "2023-11-10 00:41:46+05:30", "date_max": "2024-04-08 23:00:46+05:30"}, "charts": [{"col": "id", "missing_pct": 0.0, "unique": 298450, "n": 298450, "type": "doughnut", "labels": ["FKID000000", "FKID000001", "FKID000002", "FKID000003", "FKID000004", "FKID000005", "FKID000006", "FKID000007", "Other (298442)"], "values": [1, 1, 1, 1, 1, 1, 1, 1, 298442], "note": "298,450 unique ids"}, {"col": "latitude", "missing_pct": 0.0, "unique": 177983, "n": 298450, "type": "doughnut", "labels": ["12.802\u201312.864", "12.864\u201312.925", "12.925\u201312.987", "12.987\u201313.048", "13.048\u201313.110", "13.110\u201313.171", "13.171\u201313.232", "13.232\u201313.294"], "values": [3468, 19401, 177911, 77507, 12868, 890, 6275, 130], "note": "binned coordinate range (spatial key)"}, {"col": "longitude", "missing_pct": 0.0, "unique": 177378, "n": 298450, "type": "doughnut", "labels": ["77.442\u201377.484", "77.484\u201377.525", "77.525\u201377.566", "77.566\u201377.607", "77.607\u201377.648", "77.648\u201377.689", "77.689\u201377.731", "77.731\u201377.772"], "values": [428, 5480, 58690, 130855, 48171, 24348, 27931, 2547], "note": "binned coordinate range (spatial key)"}, {"col": "location", "missing_pct": 1.0, "unique": 10942, "n": 298450, "type": "doughnut", "labels": ["Unnamed Road, Begur Chikkanahalli, Bengaluru, Karnataka. Pin-562149 (India)", "Kamaraj Road, Sri Nagamma Devi Circle, Sivanchetti Gardens, Bengaluru, Karnataka. Pin-560042 (India)", "New Horizon College Road, New Horizon College of Engineering, Kadubisanahalli, Bengaluru, Karnataka. Pin-560103 (India)", "MBT Road, Devasandra Junction, KR Puram, Bengaluru, Karnataka. Pin-560036 (India)", "Dispensary Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (India)", "Bellary Road, Vinayaka Nagar, Hebbal, Bengaluru, Karnataka. Pin-560024 (India)", "5th Main Road, Kempe Gowda Circle, Gandhi Nagar, Bengaluru, Karnataka. Pin-560009 (India)", "Main Guard Cross Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (India)", "Other (10934)"], "values": [4090, 3999, 3785, 3027, 2670, 2639, 2604, 2549, 270046], "note": "10,942 unique ids"}, {"col": "vehicle_number", "missing_pct": 0.0, "unique": 231890, "n": 298450, "type": "doughnut", "labels": ["FKN00GL4424", "FKN00GL3514", "FKN00GL9771", "FKN00GL17863", "FKN00GL2906", "FKN00GL14092", "FKN00GL15265", "FKN00GL1875", "Other (231882)"], "values": [55, 42, 41, 41, 35, 34, 34, 30, 298138], "note": "231,890 unique ids"}, {"col": "vehicle_type", "missing_pct": 0.0, "unique": 22, "n": 298450, "type": "doughnut", "labels": ["SCOOTER", "CAR", "MOTOR CYCLE", "PASSENGER AUTO", "MAXI-CAB", "LGV", "GOODS AUTO", "MOPED", "PRIVATE BUS", "VAN", "TEMPO", "BUS (BMTC/KSRTC)", "Other (10)"], "values": [94856, 88870, 40811, 37813, 11372, 8255, 2934, 2199, 1633, 1466, 1368, 1281, 5592], "note": "category share"}, {"col": "description", "missing_pct": 100.0, "unique": 0, "n": 298450, "type": "doughnut", "labels": [], "values": [], "note": "category share"}, {"col": "violation_type", "missing_pct": 0.0, "unique": 991, "n": 298450, "type": "doughnut", "labels": ["WRONG PARKING", "NO PARKING", "PARKING IN A MAIN ROAD", "DEFECTIVE NUMBER PLATE", "PARKING ON FOOTPATH", "PARKING NEAR BUSTOP/SCHOOL/HOSPITAL ETC", "DOUBLE PARKING", "PARKING NEAR ROAD CROSSING", "REFUSE TO GO FOR HIRE", "PARKING NEAR TRAFFIC LIGHT OR ZEBRA CROSS", "PARKING OPPOSITE TO ANOTHER PARKED VEHICLE", "USING BLACK FILM/OTHER MATERIALS", "Other (15)"], "values": [164977, 139050, 23943, 7848, 3757, 2403, 2037, 1687, 887, 525, 486, 248, 607], "note": "multi-label per ticket \u2014 exploded to individual labels"}, {"col": "offence_code", "missing_pct": 0.0, "unique": 991, "n": 298450, "type": "doughnut", "labels": ["112", "113", "107", "116", "105", "111", "109", "104", "124", "106", "108", "133", "Other (15)"], "values": [164977, 139050, 23943, 7848, 3757, 2403, 2037, 1687, 887, 525, 486, 248, 607], "note": "multi-label per ticket \u2014 exploded to individual labels"}, {"col": "created_datetime", "missing_pct": 0.0, "unique": 94417, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [298450, 0], "note": "100.0% filled \u2014 engineer-usable"}, {"col": "closed_datetime", "missing_pct": 100.0, "unique": 0, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [0, 298450], "note": "0.0% filled \u2014 too empty to model"}, {"col": "modified_datetime", "missing_pct": 0.0, "unique": 298450, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [298450, 0], "note": "100.0% filled \u2014 engineer-usable"}, {"col": "device_id", "missing_pct": 0.0, "unique": 3070, "n": 298450, "type": "doughnut", "labels": ["FKDEV00021", "FKDEV00082", "FKDEV00077", "FKDEV00023", "FKDEV00075", "FKDEV00112", "FKDEV00121", "FKDEV00037", "Other (3062)"], "values": [4344, 2268, 2156, 2145, 2095, 2012, 1991, 1960, 279479], "note": "3,070 unique ids \u00b7 shown in aggregate only (officers never profiled)"}, {"col": "created_by_id", "missing_pct": 0.0, "unique": 2666, "n": 298450, "type": "doughnut", "labels": ["FKUSR00021", "FKUSR00332", "FKUSR00082", "FKUSR00077", "FKUSR00023", "FKUSR00075", "FKUSR00113", "FKUSR00122", "Other (2658)"], "values": [4099, 3467, 2268, 2175, 2145, 2095, 2004, 1991, 278201], "note": "2,666 unique ids \u00b7 shown in aggregate only (officers never profiled)"}, {"col": "center_code", "missing_pct": 3.8, "unique": 52, "n": 298450, "type": "doughnut", "labels": ["3", "16", "19", "13", "28", "30", "6", "29", "4", "15", "12", "84", "Other (40)"], "values": [34468, 28044, 22200, 20819, 17646, 14652, 10998, 8558, 6736, 6546, 6294, 6187, 104042], "note": "category share"}, {"col": "police_station", "missing_pct": 0.0, "unique": 54, "n": 298450, "type": "doughnut", "labels": ["Upparpet", "Shivajinagar", "Malleshwaram", "HAL Old Airport", "City Market", "Vijayanagara", "Rajajinagar", "Kodigehalli", "Magadi Road", "Jeevanbheemanagar", "K.R. Pura", "Halasuru Gate", "Other (42)"], "values": [34468, 28044, 22200, 20819, 17646, 14652, 10998, 10916, 8558, 6736, 6546, 6294, 110568], "note": "category share"}, {"col": "data_sent_to_scita", "missing_pct": 0.0, "unique": 2, "n": 298450, "type": "doughnut", "labels": ["TRUE", "FALSE"], "values": [255893, 42557], "note": "category share"}, {"col": "junction_name", "missing_pct": 0.0, "unique": 169, "n": 298450, "type": "doughnut", "labels": ["No Junction", "BTP051 - Safina Plaza Junction", "BTP082 - KR Market Junction", "BTP040 - Elite Junction", "BTP044 - Sagar Theatre Junction", "BTP211 - Central Street Junction", "BTP058 - Subbanna Junction", "BTP027 - Modi Bridge Junction", "BTP020 - Hosahalli Metro Station", "BTP057 - Anand Rao Junction", "BTP080 - NR Road, SP Road Junction", "BTP045 - Danvanthri Road Junction", "Other (157)"], "values": [147880, 15449, 11538, 10718, 10549, 5388, 5189, 4584, 4101, 3935, 3681, 3181, 72252], "note": "category share"}, {"col": "action_taken_timestamp", "missing_pct": 100.0, "unique": 0, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [0, 298450], "note": "0.0% filled \u2014 too empty to model"}, {"col": "data_sent_to_scita_timestamp", "missing_pct": 85.9, "unique": 42161, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [42161, 256289], "note": "14.1% filled \u2014 too empty to model"}, {"col": "updated_vehicle_number", "missing_pct": 42.0, "unique": 143133, "n": 298450, "type": "doughnut", "labels": ["FKN00GL17863", "FKN00GL3514", "FKN00GL9771", "FKN00GL15265", "FKN00GL17388", "FKN00GL1118", "FKN00GL1875", "FKN00GL25480", "Other (143125)"], "values": [36, 31, 30, 29, 23, 20, 20, 20, 172987], "note": "143,133 unique ids"}, {"col": "updated_vehicle_type", "missing_pct": 42.0, "unique": 22, "n": 298450, "type": "doughnut", "labels": ["SCOOTER", "CAR", "MOTOR CYCLE", "PASSENGER AUTO", "MAXI-CAB", "LGV", "GOODS AUTO", "MOPED", "PRIVATE BUS", "VAN", "BUS (BMTC/KSRTC)", "LORRY/GOODS VEHICLE", "Other (10)"], "values": [54867, 49936, 23533, 23007, 7283, 4942, 1798, 1080, 1018, 882, 792, 723, 3335], "note": "category share"}, {"col": "validation_status", "missing_pct": 42.0, "unique": 5, "n": 298450, "type": "doughnut", "labels": ["approved", "rejected", "created1", "processing", "duplicate"], "values": [115400, 49754, 7044, 678, 320], "note": "category share"}, {"col": "validation_timestamp", "missing_pct": 42.0, "unique": 170115, "n": 298450, "type": "doughnut", "labels": ["present", "empty"], "values": [173196, 125254], "note": "58.0% filled \u2014 engineer-usable"}], "time_charts": [{"title": "By hour of day (IST)", "labels": ["00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00"], "values": [5815, 11098, 16261, 21565, 23512, 22193, 19836, 19445, 25790, 26994, 32580, 32176, 19689, 11546, 5634, 1224, 583, 377, 150, 27, 42, 148, 725, 1035], "note": "ticket times track officer shifts \u2014 NOT traffic. Peak ~10:00, evening near-empty."}, {"title": "By weekday", "labels": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"], "values": [34680, 42697, 41974, 43547, 40864, 44523, 50160], "note": "weekday enforcement pattern"}, {"title": "By month (IST)", "labels": ["2023-11", "2023-12", "2024-01", "2024-02", "2024-03", "2024-04"], "values": [43504, 63917, 65479, 54660, 55453, 15432], "note": "real window: Nov 2023 \u2192 Apr 2024 (filename mislabel)"}], "relationship": {"keys": ["vehicle_type", "police_station", "validation_status", "violation", "junction", "hour_band", "weekday"], "matrix": [[1.0, 0.118, 0.04, 0.116, 0.105, 0.058, 0.034], [0.118, 1.0, 0.055, 0.115, 0.476, 0.148, 0.068], [0.04, 0.055, 1.0, 0.035, 0.043, 0.034, 0.059], [0.116, 0.115, 0.035, 1.0, 0.069, 0.036, 0.021], [0.105, 0.476, 0.043, 0.069, 1.0, 0.14, 0.057], [0.058, 0.148, 0.034, 0.036, 0.14, 1.0, 0.449], [0.034, 0.068, 0.059, 0.021, 0.057, 0.449, 1.0]]}};
+const PAL = ["#3E97F0","#38E1C8","#EF9F27","#E24B4A","#b98bff","#7fe0a0","#E6C229","#46c5c5",
+  "#e07fc0","#5b8def","#f2a93b","#ff7a82","#8a96ac"];
+Chart.defaults.color="#8a96ac"; Chart.defaults.borderColor="#1a2230"; Chart.defaults.font.family="DM Sans";
+
+document.getElementById("sub").textContent =
+  `${D.meta.file} · ${D.meta.date_min.slice(0,10)} → ${D.meta.date_max.slice(0,10)}`;
+document.getElementById("kpis").innerHTML =
+  [["rows",D.meta.rows.toLocaleString()],["columns",D.meta.columns],
+   ["charts",D.charts.length+D.time_charts.length]]
+  .map(([l,v])=>`<div class="kpi"><b>${v}</b><span>${l}</span></div>`).join("");
+
+function donut(elId, labels, values, cutout="62%"){
+  new Chart(document.getElementById(elId), {type:"doughnut",
+    data:{labels,datasets:[{data:values,backgroundColor:PAL,borderWidth:1,borderColor:"#0b0f18"}]},
+    options:{plugins:{legend:{position:"right",labels:{boxWidth:10,font:{size:10}}}},
+      cutout,maintainAspectRatio:false}});
+}
+function card(c, idx, prefix){
+  const id = prefix+idx;
+  return `<div class="card"><h3>${c.col||c.title}</h3>
+    <div class="meta">${c.unique!=null?`${c.unique.toLocaleString()} unique · ${c.missing_pct}% missing`:""}</div>
+    <div class="cv"><canvas id="${id}"></canvas></div>
+    <div class="note">${c.note||""}</div></div>`;
+}
+document.getElementById("time").innerHTML = D.time_charts.map((c,i)=>card(c,i,"t")).join("");
+D.time_charts.forEach((c,i)=>donut("t"+i,c.labels,c.values));
+document.getElementById("cols").innerHTML = D.charts.map((c,i)=>card(c,i,"c")).join("");
+D.charts.forEach((c,i)=>donut("c"+i,c.labels,c.values));
+
+// relationship matrix
+const {keys,matrix}=D.relationship;
+const heat=v=>{const t=Math.max(0,Math.min(1,v));const a=[16,22,33],b=[62,151,240];
+  const c=a.map((x,i)=>Math.round(x+(b[i]-x)*t));return `rgb(${c[0]},${c[1]},${c[2]})`;};
+let h="<table class='rel'><tr><th></th>"+keys.map(k=>`<th>${k}</th>`).join("")+"</tr>";
+matrix.forEach((row,i)=>{h+=`<tr><td class='k'>${keys[i]}</td>`+
+  row.map(v=>`<td style="background:${heat(v)};color:${v>0.55?'#fff':'#cdd6e6'}">${v.toFixed(2)}</td>`).join("")+"</tr>";});
+h+="</table>"; document.getElementById("rel").innerHTML=h;
+
+// roadmap
+const ROAD=[
+ ["1 · Unify on H3 × time","DATA","Convert lat/lon to H3 cells (res ~9) and build one modeling table: H3 cell × time-bucket × day-type. Free-text location/junction become display metadata, not the join key."],
+ ["2 · Enrich with Mappls","CONTEXT","Per cell: reverse-geocode road + ward/admin layer, Nearby POIs (metro, bus, school, hospital, market, parking), and station→cell ETA via Routing. These become model features."],
+ ["3 · Targets you can honestly train","MODEL","Primary: Poisson/Tweedie count of parking-obstruction events per cell-time (GLM baseline → LightGBM Poisson → CatBoost challenger). Severity-weight by violation_type/offence_code. Aux: validation_status risk; station workload."],
+ ["4 · Blind-spot layer (PU)","MODEL","No trustworthy negatives → frame as positive-unlabeled / under-observation ranking: contextually risky cell-times that are historically under-seen. Label it 'high-risk under-observed', never 'confirmed hotspot'."],
+ ["5 · Live impact (re-rank)","LIVE","Attach a present-stress signal: TomTom Flow Segment (1 − currentSpeed/freeFlowSpeed) if a mixed stack is allowed, else Mappls traffic-aware ETA deltas. Call it a Parking–Congestion Association Score."],
+ ["6 · Dispatch optimizer","OPS","priority = f(forecast pressure, blind-spot uplift, severity, live stress, station reachability) → Mappls distance-matrix / VRP for 'which station, fastest route, how many P1 in 30 min'."],
+ ["7 · Explainability","TRUST","Tree SHAP reason codes per tile ('high evening risk: metro proximity + repeat history + low parking supply + route delay'). Matters more to judges than RMSE."],
+ ["8 · Multi-user delivery","PRODUCT","Same state, 4 audiences: govt = ward planning, command = P1/P2/P3 queue, field officer = navigate + outcome capture (creates future labels), citizen = corridor risk + cleaner routes."],
+];
+document.getElementById("road").innerHTML = ROAD.map(([t,tag,p])=>
+  `<div class="step"><span class="tag">${tag}</span><b>${t}</b><p>${p}</p></div>`).join("");
+</script>
+</body></html>

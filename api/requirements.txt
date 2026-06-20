@@ -1,0 +1,6 @@
+# Co-located with the serverless entrypoint so @vercel/python installs these for
+# the function. Mirrors the root requirements.txt (kept light on purpose).
+fastapi==0.137.1
+pydantic>=2.0
+pymongo==4.10.1
+dnspython==2.7.0

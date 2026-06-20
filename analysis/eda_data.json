@@ -1,0 +1,833 @@
+{
+  "meta": {
+    "file": "jan to may police violation_anonymized791b166.csv",
+    "rows": 298450,
+    "columns": 24,
+    "date_min": "2023-11-10 00:41:46+05:30",
+    "date_max": "2024-04-08 23:00:46+05:30"
+  },
+  "charts": [
+    {
+      "col": "id",
+      "missing_pct": 0.0,
+      "unique": 298450,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "FKID000000",
+        "FKID000001",
+        "FKID000002",
+        "FKID000003",
+        "FKID000004",
+        "FKID000005",
+        "FKID000006",
+        "FKID000007",
+        "Other (298442)"
+      ],
+      "values": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        298442
+      ],
+      "note": "298,450 unique ids"
+    },
+    {
+      "col": "latitude",
+      "missing_pct": 0.0,
+      "unique": 177983,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "12.802\u201312.864",
+        "12.864\u201312.925",
+        "12.925\u201312.987",
+        "12.987\u201313.048",
+        "13.048\u201313.110",
+        "13.110\u201313.171",
+        "13.171\u201313.232",
+        "13.232\u201313.294"
+      ],
+      "values": [
+        3468,
+        19401,
+        177911,
+        77507,
+        12868,
+        890,
+        6275,
+        130
+      ],
+      "note": "binned coordinate range (spatial key)"
+    },
+    {
+      "col": "longitude",
+      "missing_pct": 0.0,
+      "unique": 177378,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "77.442\u201377.484",
+        "77.484\u201377.525",
+        "77.525\u201377.566",
+        "77.566\u201377.607",
+        "77.607\u201377.648",
+        "77.648\u201377.689",
+        "77.689\u201377.731",
+        "77.731\u201377.772"
+      ],
+      "values": [
+        428,
+        5480,
+        58690,
+        130855,
+        48171,
+        24348,
+        27931,
+        2547
+      ],
+      "note": "binned coordinate range (spatial key)"
+    },
+    {
+      "col": "location",
+      "missing_pct": 1.0,
+      "unique": 10942,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "Unnamed Road, Begur Chikkanahalli, Bengaluru, Karnataka. Pin-562149 (India)",
+        "Kamaraj Road, Sri Nagamma Devi Circle, Sivanchetti Gardens, Bengaluru, Karnataka. Pin-560042 (India)",
+        "New Horizon College Road, New Horizon College of Engineering, Kadubisanahalli, Bengaluru, Karnataka. Pin-560103 (India)",
+        "MBT Road, Devasandra Junction, KR Puram, Bengaluru, Karnataka. Pin-560036 (India)",
+        "Dispensary Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (India)",
+        "Bellary Road, Vinayaka Nagar, Hebbal, Bengaluru, Karnataka. Pin-560024 (India)",
+        "5th Main Road, Kempe Gowda Circle, Gandhi Nagar, Bengaluru, Karnataka. Pin-560009 (India)",
+        "Main Guard Cross Road, Tasker Town, Shivaji Nagar, Bengaluru, Karnataka. Pin-560001 (India)",
+        "Other (10934)"
+      ],
+      "values": [
+        4090,
+        3999,
+        3785,
+        3027,
+        2670,
+        2639,
+        2604,
+        2549,
+        270046
+      ],
+      "note": "10,942 unique ids"
+    },
+    {
+      "col": "vehicle_number",
+      "missing_pct": 0.0,
+      "unique": 231890,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "FKN00GL4424",
+        "FKN00GL3514",
+        "FKN00GL9771",
+        "FKN00GL17863",
+        "FKN00GL2906",
+        "FKN00GL14092",
+        "FKN00GL15265",
+        "FKN00GL1875",
+        "Other (231882)"
+      ],
+      "values": [
+        55,
+        42,
+        41,
+        41,
+        35,
+        34,
+        34,
+        30,
+        298138
+      ],
+      "note": "231,890 unique ids"
+    },
+    {
+      "col": "vehicle_type",
+      "missing_pct": 0.0,
+      "unique": 22,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "SCOOTER",
+        "CAR",
+        "MOTOR CYCLE",
+        "PASSENGER AUTO",
+        "MAXI-CAB",
+        "LGV",
+        "GOODS AUTO",
+        "MOPED",
+        "PRIVATE BUS",
+        "VAN",
+        "TEMPO",
+        "BUS (BMTC/KSRTC)",
+        "Other (10)"
+      ],
+      "values": [
+        94856,
+        88870,
+        40811,
+        37813,
+        11372,
+        8255,
+        2934,
+        2199,
+        1633,
+        1466,
+        1368,
+        1281,
+        5592
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "description",
+      "missing_pct": 100.0,
+      "unique": 0,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [],
+      "values": [],
+      "note": "category share"
+    },
+    {
+      "col": "violation_type",
+      "missing_pct": 0.0,
+      "unique": 991,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "WRONG PARKING",
+        "NO PARKING",
+        "PARKING IN A MAIN ROAD",
+        "DEFECTIVE NUMBER PLATE",
+        "PARKING ON FOOTPATH",
+        "PARKING NEAR BUSTOP/SCHOOL/HOSPITAL ETC",
+        "DOUBLE PARKING",
+        "PARKING NEAR ROAD CROSSING",
+        "REFUSE TO GO FOR HIRE",
+        "PARKING NEAR TRAFFIC LIGHT OR ZEBRA CROSS",
+        "PARKING OPPOSITE TO ANOTHER PARKED VEHICLE",
+        "USING BLACK FILM/OTHER MATERIALS",
+        "Other (15)"
+      ],
+      "values": [
+        164977,
+        139050,
+        23943,
+        7848,
+        3757,
+        2403,
+        2037,
+        1687,
+        887,
+        525,
+        486,
+        248,
+        607
+      ],
+      "note": "multi-label per ticket \u2014 exploded to individual labels"
+    },
+    {
+      "col": "offence_code",
+      "missing_pct": 0.0,
+      "unique": 991,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "112",
+        "113",
+        "107",
+        "116",
+        "105",
+        "111",
+        "109",
+        "104",
+        "124",
+        "106",
+        "108",
+        "133",
+        "Other (15)"
+      ],
+      "values": [
+        164977,
+        139050,
+        23943,
+        7848,
+        3757,
+        2403,
+        2037,
+        1687,
+        887,
+        525,
+        486,
+        248,
+        607
+      ],
+      "note": "multi-label per ticket \u2014 exploded to individual labels"
+    },
+    {
+      "col": "created_datetime",
+      "missing_pct": 0.0,
+      "unique": 94417,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        298450,
+        0
+      ],
+      "note": "100.0% filled \u2014 engineer-usable"
+    },
+    {
+      "col": "closed_datetime",
+      "missing_pct": 100.0,
+      "unique": 0,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        0,
+        298450
+      ],
+      "note": "0.0% filled \u2014 too empty to model"
+    },
+    {
+      "col": "modified_datetime",
+      "missing_pct": 0.0,
+      "unique": 298450,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        298450,
+        0
+      ],
+      "note": "100.0% filled \u2014 engineer-usable"
+    },
+    {
+      "col": "device_id",
+      "missing_pct": 0.0,
+      "unique": 3070,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "FKDEV00021",
+        "FKDEV00082",
+        "FKDEV00077",
+        "FKDEV00023",
+        "FKDEV00075",
+        "FKDEV00112",
+        "FKDEV00121",
+        "FKDEV00037",
+        "Other (3062)"
+      ],
+      "values": [
+        4344,
+        2268,
+        2156,
+        2145,
+        2095,
+        2012,
+        1991,
+        1960,
+        279479
+      ],
+      "note": "3,070 unique ids \u00b7 shown in aggregate only (officers never profiled)"
+    },
+    {
+      "col": "created_by_id",
+      "missing_pct": 0.0,
+      "unique": 2666,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "FKUSR00021",
+        "FKUSR00332",
+        "FKUSR00082",
+        "FKUSR00077",
+        "FKUSR00023",
+        "FKUSR00075",
+        "FKUSR00113",
+        "FKUSR00122",
+        "Other (2658)"
+      ],
+      "values": [
+        4099,
+        3467,
+        2268,
+        2175,
+        2145,
+        2095,
+        2004,
+        1991,
+        278201
+      ],
+      "note": "2,666 unique ids \u00b7 shown in aggregate only (officers never profiled)"
+    },
+    {
+      "col": "center_code",
+      "missing_pct": 3.8,
+      "unique": 52,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "3",
+        "16",
+        "19",
+        "13",
+        "28",
+        "30",
+        "6",
+        "29",
+        "4",
+        "15",
+        "12",
+        "84",
+        "Other (40)"
+      ],
+      "values": [
+        34468,
+        28044,
+        22200,
+        20819,
+        17646,
+        14652,
+        10998,
+        8558,
+        6736,
+        6546,
+        6294,
+        6187,
+        104042
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "police_station",
+      "missing_pct": 0.0,
+      "unique": 54,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "Upparpet",
+        "Shivajinagar",
+        "Malleshwaram",
+        "HAL Old Airport",
+        "City Market",
+        "Vijayanagara",
+        "Rajajinagar",
+        "Kodigehalli",
+        "Magadi Road",
+        "Jeevanbheemanagar",
+        "K.R. Pura",
+        "Halasuru Gate",
+        "Other (42)"
+      ],
+      "values": [
+        34468,
+        28044,
+        22200,
+        20819,
+        17646,
+        14652,
+        10998,
+        10916,
+        8558,
+        6736,
+        6546,
+        6294,
+        110568
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "data_sent_to_scita",
+      "missing_pct": 0.0,
+      "unique": 2,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "TRUE",
+        "FALSE"
+      ],
+      "values": [
+        255893,
+        42557
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "junction_name",
+      "missing_pct": 0.0,
+      "unique": 169,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "No Junction",
+        "BTP051 - Safina Plaza Junction",
+        "BTP082 - KR Market Junction",
+        "BTP040 - Elite Junction",
+        "BTP044 - Sagar Theatre Junction",
+        "BTP211 - Central Street Junction",
+        "BTP058 - Subbanna Junction",
+        "BTP027 - Modi Bridge Junction",
+        "BTP020 - Hosahalli Metro Station",
+        "BTP057 - Anand Rao Junction",
+        "BTP080 - NR Road, SP Road Junction",
+        "BTP045 - Danvanthri Road Junction",
+        "Other (157)"
+      ],
+      "values": [
+        147880,
+        15449,
+        11538,
+        10718,
+        10549,
+        5388,
+        5189,
+        4584,
+        4101,
+        3935,
+        3681,
+        3181,
+        72252
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "action_taken_timestamp",
+      "missing_pct": 100.0,
+      "unique": 0,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        0,
+        298450
+      ],
+      "note": "0.0% filled \u2014 too empty to model"
+    },
+    {
+      "col": "data_sent_to_scita_timestamp",
+      "missing_pct": 85.9,
+      "unique": 42161,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        42161,
+        256289
+      ],
+      "note": "14.1% filled \u2014 too empty to model"
+    },
+    {
+      "col": "updated_vehicle_number",
+      "missing_pct": 42.0,
+      "unique": 143133,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "FKN00GL17863",
+        "FKN00GL3514",
+        "FKN00GL9771",
+        "FKN00GL15265",
+        "FKN00GL17388",
+        "FKN00GL1118",
+        "FKN00GL1875",
+        "FKN00GL25480",
+        "Other (143125)"
+      ],
+      "values": [
+        36,
+        31,
+        30,
+        29,
+        23,
+        20,
+        20,
+        20,
+        172987
+      ],
+      "note": "143,133 unique ids"
+    },
+    {
+      "col": "updated_vehicle_type",
+      "missing_pct": 42.0,
+      "unique": 22,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "SCOOTER",
+        "CAR",
+        "MOTOR CYCLE",
+        "PASSENGER AUTO",
+        "MAXI-CAB",
+        "LGV",
+        "GOODS AUTO",
+        "MOPED",
+        "PRIVATE BUS",
+        "VAN",
+        "BUS (BMTC/KSRTC)",
+        "LORRY/GOODS VEHICLE",
+        "Other (10)"
+      ],
+      "values": [
+        54867,
+        49936,
+        23533,
+        23007,
+        7283,
+        4942,
+        1798,
+        1080,
+        1018,
+        882,
+        792,
+        723,
+        3335
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "validation_status",
+      "missing_pct": 42.0,
+      "unique": 5,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "approved",
+        "rejected",
+        "created1",
+        "processing",
+        "duplicate"
+      ],
+      "values": [
+        115400,
+        49754,
+        7044,
+        678,
+        320
+      ],
+      "note": "category share"
+    },
+    {
+      "col": "validation_timestamp",
+      "missing_pct": 42.0,
+      "unique": 170115,
+      "n": 298450,
+      "type": "doughnut",
+      "labels": [
+        "present",
+        "empty"
+      ],
+      "values": [
+        173196,
+        125254
+      ],
+      "note": "58.0% filled \u2014 engineer-usable"
+    }
+  ],
+  "time_charts": [
+    {
+      "title": "By hour of day (IST)",
+      "labels": [
+        "00:00",
+        "01:00",
+        "02:00",
+        "03:00",
+        "04:00",
+        "05:00",
+        "06:00",
+        "07:00",
+        "08:00",
+        "09:00",
+        "10:00",
+        "11:00",
+        "12:00",
+        "13:00",
+        "14:00",
+        "15:00",
+        "16:00",
+        "17:00",
+        "18:00",
+        "19:00",
+        "20:00",
+        "21:00",
+        "22:00",
+        "23:00"
+      ],
+      "values": [
+        5815,
+        11098,
+        16261,
+        21565,
+        23512,
+        22193,
+        19836,
+        19445,
+        25790,
+        26994,
+        32580,
+        32176,
+        19689,
+        11546,
+        5634,
+        1224,
+        583,
+        377,
+        150,
+        27,
+        42,
+        148,
+        725,
+        1035
+      ],
+      "note": "ticket times track officer shifts \u2014 NOT traffic. Peak ~10:00, evening near-empty."
+    },
+    {
+      "title": "By weekday",
+      "labels": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+      ],
+      "values": [
+        34680,
+        42697,
+        41974,
+        43547,
+        40864,
+        44523,
+        50160
+      ],
+      "note": "weekday enforcement pattern"
+    },
+    {
+      "title": "By month (IST)",
+      "labels": [
+        "2023-11",
+        "2023-12",
+        "2024-01",
+        "2024-02",
+        "2024-03",
+        "2024-04"
+      ],
+      "values": [
+        43504,
+        63917,
+        65479,
+        54660,
+        55453,
+        15432
+      ],
+      "note": "real window: Nov 2023 \u2192 Apr 2024 (filename mislabel)"
+    }
+  ],
+  "relationship": {
+    "keys": [
+      "vehicle_type",
+      "police_station",
+      "validation_status",
+      "violation",
+      "junction",
+      "hour_band",
+      "weekday"
+    ],
+    "matrix": [
+      [
+        1.0,
+        0.118,
+        0.04,
+        0.116,
+        0.105,
+        0.058,
+        0.034
+      ],
+      [
+        0.118,
+        1.0,
+        0.055,
+        0.115,
+        0.476,
+        0.148,
+        0.068
+      ],
+      [
+        0.04,
+        0.055,
+        1.0,
+        0.035,
+        0.043,
+        0.034,
+        0.059
+      ],
+      [
+        0.116,
+        0.115,
+        0.035,
+        1.0,
+        0.069,
+        0.036,
+        0.021
+      ],
+      [
+        0.105,
+        0.476,
+        0.043,
+        0.069,
+        1.0,
+        0.14,
+        0.057
+      ],
+      [
+        0.058,
+        0.148,
+        0.034,
+        0.036,
+        0.14,
+        1.0,
+        0.449
+      ],
+      [
+        0.034,
+        0.068,
+        0.059,
+        0.021,
+        0.057,
+        0.449,
+        1.0
+      ]
+    ]
+  }
+}

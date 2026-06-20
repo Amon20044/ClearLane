@@ -87,6 +87,112 @@ export async function api(path) {
   throw new Error("no demo fallback for " + path);
 }
 
+// ---- Multi-model dispatch layer (reranker + bandit), demo-safe ------------- #
+const _dscore = (z) =>
+  z.dispatch_priority != null ? z.dispatch_priority : (z.priority || 0);
+
+// derive reason codes client-side when the artifact predates the reranker
+function _fallbackReasons(z) {
+  if (z.reason_codes && z.reason_codes.length) return z.reason_codes;
+  const r = [];
+  if ((z.forecast_score ?? 0) >= 60 || z.rising) r.push("forecast pressure rising next month");
+  if ((z.pressure ?? 0) >= 60) r.push("high current obstruction pressure");
+  if ((z.under_observed ?? 0) >= 60 || z.blind_spot_ml) r.push("likely under-observed (blind spot)");
+  if (z.chronic) r.push("chronic hotspot");
+  if (z.evening_blind_spot) r.push("evening enforcement gap");
+  return r.slice(0, 4);
+}
+
+async function _demoZones() {
+  const p = await getJSON("/demo/map_payload.json");
+  return p.zones || [];
+}
+
+export async function dispatchQueue({ station, tier, live = false, limit = 60 } = {}) {
+  const qs = new URLSearchParams();
+  if (station) qs.set("station", station);
+  if (tier) qs.set("tier", tier);
+  if (live) qs.set("live", "1");
+  qs.set("limit", String(limit));
+  if (LIVE) {
+    try { return await getJSON(`${BASE}/api/dispatch/queue?${qs}`); }
+    catch { LIVE = false; }
+  }
+  let zones = await _demoZones();
+  if (station) zones = zones.filter((z) => (z.station || "").toLowerCase() === station.toLowerCase());
+  if (tier) zones = zones.filter((z) => z.tier === tier.toUpperCase());
+  const queue = [...zones].sort((a, b) => _dscore(b) - _dscore(a)).slice(0, limit)
+    .map((z) => ({
+      id: z.id, name: z.name, station: z.station, tier: z.tier, lat: z.lat, lon: z.lon,
+      dispatch_priority: Math.round(_dscore(z) * 10) / 10, priority: z.priority,
+      pressure: z.pressure, forecast_score: z.forecast_score, under_observed: z.under_observed,
+      blind_spot_ml: z.blind_spot_ml || false, evening_blind_spot: z.evening_blind_spot || false,
+      reason_codes: _fallbackReasons(z), assoc_score: null, eta_min: null, live: false,
+    }));
+  return { live: false, mappls: false, count: queue.length,
+           note: "offline demo — dispatch_priority falls back to historical priority.",
+           generated_at: new Date().toISOString(), last_recalc: null,
+           auto_interval_min: 5, queue };
+}
+
+// Force a live rerank now (also what the Vercel cron hits every 5 min).
+export async function dispatchRecalc({ limit = 80 } = {}) {
+  if (LIVE) {
+    try { return await getJSON(`${BASE}/api/dispatch/recalc?limit=${limit}`); }
+    catch { LIVE = false; }
+  }
+  const q = await dispatchQueue({ limit });        // offline: just rebuild from the bundle
+  return { ...q, persisted: false };
+}
+
+export async function dispatchNext({ station, n = 5 } = {}) {
+  const qs = new URLSearchParams();
+  if (station) qs.set("station", station);
+  qs.set("n", String(n));
+  if (LIVE) {
+    try { return await getJSON(`${BASE}/api/dispatch/next?${qs}`); }
+    catch { LIVE = false; }
+  }
+  const { queue } = await dispatchQueue({ station, limit: n });
+  return { algo: "offline (priority)", n: queue.length,
+           selected: queue.map((z) => ({ ...z, bandit_score: null, exploit: null, explore_bonus: null })),
+           note: "Bandit runs on the live backend; offline shows the deterministic top picks." };
+}
+
+export async function zoneWhy(id) {
+  if (LIVE) {
+    try { return await getJSON(`${BASE}/api/zone/${encodeURIComponent(id)}/why`); }
+    catch { LIVE = false; }
+  }
+  const z = (await detailMap())[id] || {};
+  const disp = z.dispatch || {};
+  return { id, name: z.name, tier: z.tier, dispatch: disp,
+           reason_codes: (disp.reason_codes && disp.reason_codes.length)
+             ? disp.reason_codes : _fallbackReasons(z),
+           forecast: z.forecast, blind_spot: z.blind_spot, flow_impact: z.flow_impact,
+           scores: z.scores, explanation: z.explanation, model_drivers: [],
+           model: { forecaster: "precomputed", objective: "poisson" } };
+}
+
+export async function dispatchReward(body) {
+  try { return await postJSON("/api/dispatch/reward", body); }
+  catch { return { ok: false, offline: true }; }
+}
+
+export async function dispatchRoute(body) {
+  try { return await postJSON("/api/dispatch/route", body); }
+  catch {
+    const zones = await _demoZones();
+    const zmap = Object.fromEntries(zones.map((z) => [z.id, z]));
+    const route = (body.ids || []).filter((i) => zmap[i]).map((i) => {
+      const z = zmap[i];
+      return { id: z.id, name: z.name, station: z.station, lat: z.lat, lon: z.lon,
+               dispatch_priority: Math.round(_dscore(z) * 10) / 10 };
+    });
+    return { live: false, stops: route.length, route };
+  }
+}
+
 // ---- Operational loop (live backend, with an offline in-memory fallback) ---
 import * as localOps from "./localOps.js";
 

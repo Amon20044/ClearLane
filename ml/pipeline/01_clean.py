@@ -76,6 +76,15 @@ def run() -> pd.DataFrame:
     df["row_severity"] = df["violation_list"].map(U.row_severity)
     df["vehicle_wt"] = df["vehicle_type"].map(U.vehicle_weight)
 
+    # --- offence_code (AUXILIARY signal; never feeds event_weight) --------- #
+    # The offence codes mirror the violation labels (verified in EDA). We parse
+    # them into a max-severity feature for the forecaster + display only, so the
+    # scored event_weight / Pillar A / tiers stay byte-identical.
+    df["offence_codes"] = df["offence_code"].map(U.parse_array)
+    df["offence_severity_aux"] = df["offence_codes"].map(
+        lambda xs: max((C.OFFENCE_CODE_SEVERITY.get(str(x).strip(), 0.0) for x in xs),
+                       default=0.0))
+
     # --- filters ----------------------------------------------------------- #
     log(f"--- filtering (start {len(df):,}) ---")
 
@@ -115,8 +124,8 @@ def run() -> pd.DataFrame:
     keep_cols = [
         "id", "latitude", "longitude", "location", "vehicle_number",
         "vehicle_type", "vehicle_wt", "primary_violation", "row_severity",
-        "n_violations", "police_station", "junction_name", "device_id",
-        "created_by_id", "scita", "confidence", "confidence_mult",
+        "offence_severity_aux", "n_violations", "police_station", "junction_name",
+        "device_id", "created_by_id", "scita", "confidence", "confidence_mult",
         "event_weight", "created_ist", "hour_ist", "dow_ist", "date_ist",
         "month_ist", "is_weekend", "bucket_100m", "point_11m",
     ]

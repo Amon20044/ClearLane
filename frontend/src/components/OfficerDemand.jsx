@@ -95,7 +95,7 @@ export default function OfficerDemand({ zones, lens, daily, snapshot, defaultSta
   const maxNeeded = Math.max(1, ...rows.map((r) => r.needed));
 
   return (
-    <div className="panel">
+    <div className="panel page">
       <h2>Officer-demand & deployment</h2>
       <p className="sub">
         Expected enforcement load for <b>{lensLabel(lens, daily)}</b>{!isActive(lens) && " (pick a date above)"} →
@@ -104,19 +104,19 @@ export default function OfficerDemand({ zones, lens, daily, snapshot, defaultSta
         <b> ticket volume, not congestion</b>; "force" = distinct officers historically seen (proxy).
       </p>
 
-      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "flex-end", margin: "8px 0 16px" }}>
-        <label style={{ fontSize: 12 }}>Area<br />
-          <select className="searchbox" style={{ width: 220 }} value={scope}
+      <div className="toolbar">
+        <label className="ctrl">Area
+          <select className="searchbox" value={scope}
             onChange={(e) => setScope(e.target.value)}>
             <option value="city">Whole city</option>
             {stations.map((s) => <option key={s} value={s}>{s}</option>)}
           </select></label>
-        <label style={{ fontSize: 12 }}>Shift hours: <b>{hours}h</b><br />
+        <label className="ctrl">Shift hours: <b style={{ color: "var(--txt)" }}>{hours}h</b>
           <input type="range" min="4" max="12" value={hours} className="slider"
-            onChange={(e) => setHours(+e.target.value)} style={{ width: 150 }} /></label>
-        <label style={{ fontSize: 12 }}>Tickets / officer / hour: <b>{rate}</b><br />
+            onChange={(e) => setHours(+e.target.value)} /></label>
+        <label className="ctrl">Tickets / officer / hour: <b style={{ color: "var(--txt)" }}>{rate}</b>
           <input type="range" min="1" max="10" step="0.5" value={rate} className="slider"
-            onChange={(e) => setRate(+e.target.value)} style={{ width: 150 }} /></label>
+            onChange={(e) => setRate(+e.target.value)} /></label>
       </div>
 
       <div className="dials" style={{ marginBottom: 8 }}>
@@ -141,8 +141,8 @@ export default function OfficerDemand({ zones, lens, daily, snapshot, defaultSta
       )}
 
       <h3>Per-station deployment ({rows.length} stations · {rows.reduce((s, r) => s + r.needed, 0)} needed · {rows.reduce((s, r) => s + r.deployed, 0)} deployed)</h3>
-      <div className="scroll" style={{ maxHeight: "44vh" }}>
-        <table>
+      <div className="scroll">
+        <table className="dt">
           <thead><tr><th>Station</th><th>Expected/day</th><th>Needed</th><th>Deployed</th><th>Gap</th><th>Force</th><th>Nearest station</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => {
@@ -150,21 +150,21 @@ export default function OfficerDemand({ zones, lens, daily, snapshot, defaultSta
               return (
                 <tr key={r.st} onClick={() => setScope(r.st)} style={{ cursor: "pointer" }}
                   className={sel ? "row-sel" : ""}>
-                  <td><b>{r.st}</b>{sel && <span className="flag" style={{ marginLeft: 6 }}>selected</span>}</td>
-                  <td className="mono">{Math.round(r.exp).toLocaleString("en-IN")}</td>
-                  <td className="mono" style={{ color: "var(--accent)" }}>{r.needed}</td>
-                  <td className="mono" style={{ color: "var(--amber)" }}>{r.deployed}</td>
-                  <td className="mono" style={{ color: r.gap > 0 ? "#ff8a8a" : "var(--good)" }}>
+                  <td data-label="Station"><b>{r.st}</b>{sel && <span className="flag" style={{ marginLeft: 6 }}>selected</span>}</td>
+                  <td data-label="Expected/day" className="mono">{Math.round(r.exp).toLocaleString("en-IN")}</td>
+                  <td data-label="Needed" className="mono" style={{ color: "var(--accent)" }}>{r.needed}</td>
+                  <td data-label="Deployed" className="mono" style={{ color: "var(--amber)" }}>{r.deployed}</td>
+                  <td data-label="Gap" className="mono" style={{ color: r.gap > 0 ? "#ff8a8a" : "var(--good)" }}>
                     {r.gap > 0 ? `−${r.gap}` : "✓"}</td>
-                  <td className="mono muted">{r.force ?? "—"}</td>
-                  <td style={{ fontSize: 12 }}>
+                  <td data-label="Force" className="mono muted">{r.force ?? "—"}</td>
+                  <td data-label="Nearest station" style={{ fontSize: 12 }}>
                     {r.nearest
                       ? <span title="borrow troops from here" style={{ cursor: "pointer", color: "var(--accent)" }}
                           onClick={(e) => { e.stopPropagation(); setScope(r.nearest.name); }}>
                           {r.nearest.name} <span className="muted">· {km(r.nearest.dist)}</span></span>
                       : <span className="muted">—</span>}
                   </td>
-                  <td><div className="bar" style={{ maxWidth: 150 }}>
+                  <td data-label="Load"><div className="bar" style={{ maxWidth: 150 }}>
                     <span style={{ width: Math.min(100, (r.needed / maxNeeded) * 100) + "%",
                       background: r.gap > 0 ? "#ff8a8a" : "var(--accent)" }} /></div></td>
                 </tr>

@@ -23,7 +23,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "api"))   # the FastAPI app package lives in api/clearlane
 
 # tiny .env loader (no python-dotenv dependency required)
 def _load_env():
@@ -39,7 +39,7 @@ def _load_env():
 
 _load_env()
 
-from backend.app import db  # noqa: E402
+from clearlane import db  # noqa: E402
 
 PROC = ROOT / "data" / "processed"
 DEMO = ROOT / "frontend" / "public" / "demo"
@@ -90,7 +90,7 @@ def migrate_artifacts() -> int:
 
 
 def seed_force(reseed: bool):
-    from backend.app import force, operational
+    from clearlane import force, operational
 
     if reseed:
         print("Wiping fz_stations / fz_officers / fz_sessions ...")

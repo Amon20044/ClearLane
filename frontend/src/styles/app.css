@@ -47,7 +47,8 @@ body::before {
 }
 .mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-feature-settings: "tnum" 1; }
-.app { display: grid; grid-template-rows: auto 1fr; height: 100vh; height: 100dvh; min-height: 0; }
+.app { display: grid; grid-template-rows: auto 1fr; height: 100vh; height: 100dvh;
+  min-height: 0; min-width: 0; overflow-x: hidden; }
 h1, h2, h3 { letter-spacing: -0.01em; }
 
 :where(button, a, input, select, textarea):focus-visible {
@@ -165,16 +166,27 @@ h1, h2, h3 { letter-spacing: -0.01em; }
 .sidenav-backdrop { display: none; }
 
 .content { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
-.view { min-height: 0; overflow: auto; padding: 18px 20px; }
+/* min-width:0 is the key to containment: without it this grid/flex item grows to
+   fit a wide table and the WHOLE app scrolls sideways. With it, the overflow is
+   trapped in the inner .scroll box instead. */
+.view { min-height: 0; min-width: 0; overflow: auto; padding: 18px 20px; }
 .view.map-view { padding: 0; position: relative; overflow: hidden; }
 
-/* Full-height pages: a single-panel view fills the available height and its inner
-   table/list scrolls internally (one scrollbar, no fixed-vh gap). */
+/* ---- Centralized data-page layout (one consistent model for every screen) ----
+   The single panel fills the height; the TABLE lives in its own bounded .scroll
+   box that scrolls vertically (rows) AND horizontally (the many columns) — the
+   horizontal scrollbar belongs to that inner box only, never the page. The panel
+   itself can scroll vertically so multi-section pages (filters + table + roster)
+   never clip a lower section. */
 .view:not(.map-view) { display: flex; flex-direction: column; }
 .view:not(.map-view) > .panel:only-child {
-  flex: 1 1 auto; min-height: 0; margin-bottom: 0; display: flex; flex-direction: column; }
+  flex: 1 1 auto; min-height: 0; min-width: 0; margin-bottom: 0;
+  overflow: hidden auto;                 /* x: contained, y: scroll */
+  display: flex; flex-direction: column; }
 .view:not(.map-view) > .panel:only-child > .scroll {
-  flex: 1 1 auto; max-height: none; min-height: 140px; }
+  flex: 1 1 auto; min-width: 0;
+  min-height: 60dvh; max-height: 100vh;  /* table box: ≥60dvh, ≤100vh */
+  overflow: auto; }                      /* both axes scroll INSIDE this box */
 
 /* collapsible metrics (KPI strip + date lens) — more map breathing space */
 .metrics { background: rgba(13,17,26,.45); border-bottom: 1px solid var(--line); }
@@ -350,7 +362,40 @@ input[type=range] { width: 100%; accent-color: var(--accent); }
 .searchbox:focus { border-color: var(--accent); outline: none; }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
-.scroll { max-height: 62vh; overflow: auto; }
+.scroll { max-height: 62vh; overflow: auto; min-width: 0; }
+
+/* ---- responsive data screens (flow-impact / staffing / offenders / ROI) ---- */
+/* Wide data tables keep readable column widths and scroll horizontally inside
+   their bounded .scroll box on small screens, instead of crushing every column.
+   Stays tabular on every viewport (no card transform). */
+.dt { min-width: 720px; }
+.dt th, .dt td { white-space: nowrap; }
+
+/* "Biggest movers" highlight chips — stack full-width on phones (no sideways cut-off) */
+@media (max-width: 560px) {
+  .rankstory > div:last-child { flex-direction: column; }
+  .rankstory .btn { flex: 1 1 100% !important; width: 100%; }
+}
+
+/* a row of filter chips/buttons that wraps instead of overflowing sideways */
+.filterbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.filterbar > * { margin: 0 !important; }
+
+/* a toolbar of filter controls that wraps cleanly and goes full-width on mobile */
+.toolbar { display: flex; flex-wrap: wrap; gap: 14px; align-items: flex-end; margin: 10px 0 16px; }
+.toolbar label { font-size: 12px; color: var(--muted); }
+.toolbar .ctrl { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.toolbar select.searchbox, .toolbar input.searchbox { width: 200px; max-width: 100%; }
+.toolbar input[type=range] { width: 160px; max-width: 100%; }
+
+/* side list + detail layout (repeat-offenders) */
+.split { display: grid; grid-template-columns: minmax(220px, 300px) 1fr; gap: 16px; min-height: 0; }
+.split > * { min-width: 0; }
+
+/* coverage / ROI headline stat */
+.roi-stat { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+.roi-stat .big { font-size: clamp(32px, 8vw, 46px); font-weight: 800; line-height: 1; }
+.roi-stat .arrow { font-size: 26px; font-weight: 700; color: var(--muted); }
 
 /* live vehicle-number tag on complaint points */
 .leaflet-tooltip.veh-tag { background: rgba(17,21,31,.95); color: var(--accent);
@@ -511,9 +556,50 @@ input[type=date], input[type=date].searchbox { color-scheme: dark; }
     background: rgba(0,0,0,.5); backdrop-filter: blur(2px); }
 }
 
+/* Tablet & below: collapse the side-list/detail split into one column. */
+@media (max-width: 820px) {
+  .split { grid-template-columns: 1fr; gap: 14px; }
+  .split .offender-list { max-height: 280px; }
+  .toolbar select.searchbox, .toolbar input.searchbox { width: 100%; }
+}
+
+/* Tables stay TABULAR on every screen (no card transform). On phones they keep
+   their min-width and scroll horizontally inside the bounded .scroll box, while
+   the box scrolls vertically — two-axis scroll, columns intact. The sticky header
+   keeps the column names visible while scrolling rows. */
+.scroll table:not(.dt) { min-width: 560px; }   /* any data table scrolls sideways when cramped */
+@media (max-width: 700px) {
+  .dt, .scroll table { font-size: 12px; }
+  .dt th, .dt td { padding: 7px 9px; }
+}
+
+/* Concise explainer copy on phones: clamp the .sub paragraphs to 2 lines so each
+   screen leads with its data, not a wall of text. Tap to reveal the full note
+   (handled globally in main.jsx). Desktop keeps the full text. */
+@media (max-width: 700px) {
+  .panel .sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; cursor: pointer; position: relative; margin-bottom: 12px; }
+  .panel .sub.sub--open { -webkit-line-clamp: unset; overflow: visible; }
+  .panel .sub.is-clamped:not(.sub--open)::after { content: "… more"; position: absolute; right: 0; bottom: 0;
+    color: var(--accent); font-weight: 700; font-size: 11px;
+    padding: 0 2px 0 30px; background: linear-gradient(90deg, transparent, #121826 42%); }
+}
+
 /* Phones */
 @media (max-width: 520px) {
   body { font-size: 13.5px; }
+  /* Today / Emergency cards: let the score + actions wrap to a full-width row. */
+  .today-card { grid-template-columns: 28px 1fr !important; column-gap: 10px !important; }
+  .today-card > :last-child { grid-column: 1 / -1 !important; flex-direction: row !important;
+    align-items: center !important; justify-content: space-between !important;
+    text-align: left !important; margin-top: 6px; }
+  .today-card .bar { max-width: none !important; }
+  .roi-stat { gap: 14px; }
+  .roi-stat .arrow { display: none; }
+  /* roster: let the add-officer controls wrap instead of overflowing */
+  .add-officer { flex-wrap: wrap; }
+  .add-officer .searchbox { flex: 1 1 120px; }
+  .add-officer .btn { flex: 1 1 100%; }
   .header { gap: 6px 8px; padding: 8px 12px; }
   .hide-sm { display: none !important; }
   .wordmark { font-size: 16px; }
@@ -787,3 +873,111 @@ input[type=date], input[type=date].searchbox { color-scheme: dark; }
 .off-shift-off { display: flex; align-items: center; gap: 8px; padding: 4px 2px;
   border-bottom: 1px solid var(--line-soft); }
 .off-sim-note { font-size: 10px; color: var(--muted); margin-top: 8px; }
+
+/* ---- Dispatch AI (M4 reranker + bandit, reason-code popups, heat map) ---- */
+.dispatch-view { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 12px; }
+.dispatch-head { display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px 16px; flex-wrap: wrap; }
+.dispatch-title { min-width: 0; }
+.dispatch-title h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 3px;
+  font-size: 19px; letter-spacing: -.2px; }
+.dispatch-title .muted { max-width: 64ch; font-size: 12.5px; line-height: 1.45; }
+.dispatch-stamp { display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  margin-top: 8px; font-size: 11.5px; color: var(--muted); }
+.dispatch-stamp b { color: var(--txt); font-weight: 600; }
+.dispatch-stamp .sep { opacity: .45; }
+.stamp-dot { width: 8px; height: 8px; border-radius: 99px; background: var(--muted); }
+.stamp-dot[data-live="1"] { background: var(--accent-2); box-shadow: 0 0 8px var(--accent-2);
+  animation: pulse-dot 1.8s ease-in-out infinite; }
+@keyframes pulse-dot { 50% { opacity: .4; } }
+.chip { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  padding: 2px 7px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--line);
+  color: var(--muted); }
+.chip.live { color: #04110d; background: var(--accent-2); border-color: transparent; }
+.dispatch-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: flex-start; }
+.live-toggle.on { border-color: var(--accent-2); color: var(--accent-2);
+  box-shadow: 0 0 0 1px var(--accent-2) inset; }
+.recalc-btn { white-space: nowrap; }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.dispatch-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(320px, 0.95fr);
+  gap: 14px; flex: 1; min-height: 0; }
+.dispatch-map { position: relative; border-radius: var(--radius); overflow: hidden;
+  border: 1px solid var(--line); min-height: 420px; }
+.dispatch-side { display: flex; flex-direction: column; gap: 12px; min-height: 0; min-width: 0; }
+
+.dq-card { background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 12px 6px; min-width: 0; }
+.dq-card-head { display: flex; align-items: center; justify-content: space-between;
+  font-weight: 700; font-size: 13px; }
+.dq-card-head > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.algo { font-size: 10px; color: var(--accent-2); font-weight: 600;
+  background: rgba(56,225,200,.1); padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.tiny { font-size: 10.5px; line-height: 1.4; }
+
+/* shared rank pill + name + reasons (used by bandit + queue) */
+.dq-rank { width: 19px; height: 19px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent); border-radius: 6px;
+  font-size: 11px; font-weight: 700; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.dq-name { background: none; border: none; color: var(--txt); cursor: pointer; padding: 0;
+  font-size: 12.5px; font-weight: 500; text-align: left; min-width: 0; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dq-name:hover { color: var(--accent); }
+.dq-reasons { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; }
+
+/* bandit picks */
+.bandit-list { margin-top: 4px; }
+.bandit-row { display: flex; align-items: center; gap: 9px; padding: 7px 0;
+  border-top: 1px solid var(--line-soft); }
+.bandit-body { flex: 1; min-width: 0; }
+.xtag { font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  padding: 2px 6px; border-radius: 99px; background: var(--accent-soft); color: var(--accent);
+  flex-shrink: 0; }
+.rw { display: flex; gap: 5px; flex-shrink: 0; }
+.rw button { width: 24px; height: 24px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--muted); cursor: pointer; display: grid; place-items: center;
+  transition: border-color .12s, color .12s, background .12s; }
+.rw-ok:hover { border-color: var(--p4); color: var(--p4); background: rgba(99,153,34,.12); }
+.rw-no:hover { border-color: var(--p1); color: var(--p1); background: rgba(226,75,74,.12); }
+
+/* reranked queue */
+.queue-card { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.dq-list { overflow-y: auto; min-height: 0; margin: 4px -6px 0; padding: 0 6px; }
+.dq-row { padding: 8px 0; border-top: 1px solid var(--line-soft); display: flex; gap: 9px; }
+.dq-row:first-child { border-top: none; }
+.dq-row.open { background: rgba(62,151,240,.05); border-radius: 8px; padding: 8px 6px; margin: 0 -6px; }
+.dq-body { flex: 1; min-width: 0; }
+.dq-top { display: flex; align-items: center; gap: 8px; }
+.dq-dot { width: 9px; height: 9px; border-radius: 99px; flex-shrink: 0; }
+.eta { font-size: 10px; color: var(--accent-2); font-weight: 600; flex-shrink: 0;
+  background: rgba(56,225,200,.1); padding: 1px 6px; border-radius: 99px; }
+.dq-pri { font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; flex-shrink: 0;
+  min-width: 26px; text-align: right; }
+.dq-why { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel2); color: var(--muted); cursor: pointer; font-size: 13px; flex-shrink: 0;
+  line-height: 1; }
+.dq-why:hover { border-color: var(--accent); color: var(--accent); }
+.dq-reasons { margin-top: 3px; padding-left: 17px; }
+.dq-whybox { margin: 7px 0 2px 17px; padding: 8px 10px; background: var(--panel2);
+  border: 1px solid var(--line-soft); border-radius: 8px; font-size: 11px; line-height: 1.5; }
+.wb-reasons { color: var(--accent-2); }
+.wb-drivers, .wb-model { color: var(--muted); margin-top: 3px; }
+.wb-drivers b { color: var(--txt); }
+
+/* leaflet popup (light bg) */
+.pop-pri { font-size: 11px; color: #333; margin: 4px 0; }
+.pop-reasons { margin: 4px 0 0; padding-left: 16px; font-size: 11px; color: #444; }
+.tier-chip { font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 4px;
+  background: #eee; color: #333; }
+.dispatch-toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: #fff; padding: 10px 18px; border-radius: 99px;
+  font-size: 12.5px; font-weight: 600; box-shadow: 0 8px 28px rgba(0,0,0,.4); z-index: 200; }
+
+@media (max-width: 980px) {
+  .dispatch-grid { grid-template-columns: 1fr; }
+  .dispatch-map { min-height: 300px; }
+  .dispatch-actions { width: 100%; }
+  .recalc-btn { flex: 1; justify-content: center; }
+}

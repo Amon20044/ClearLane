@@ -31,14 +31,14 @@ export default function CoverageSimulator({ totalZones }) {
       <p className="sub">Deploying officers to the top-K <b>priority</b> zones covers what share of total
         <b> weighted obstruction evidence</b>? (Evidence-coverage, not a congestion-reduction claim.)</p>
 
-      <div style={{ display: "flex", gap: 24, alignItems: "center", margin: "18px 0" }}>
+      <div className="roi-stat">
         <div>
-          <div style={{ fontSize: 44, fontWeight: 800, color: "#378ADD" }}>{at}%</div>
+          <div className="big" style={{ color: "#378ADD" }}>{at}%</div>
           <div className="muted">of weighted obstruction evidence</div>
         </div>
-        <div style={{ fontSize: 28, fontWeight: 700 }}>←</div>
+        <div className="arrow">←</div>
         <div>
-          <div style={{ fontSize: 44, fontWeight: 800 }}>{k}</div>
+          <div className="big">{k}</div>
           <div className="muted">of {totalZones} zones enforced</div>
         </div>
       </div>
@@ -47,7 +47,8 @@ export default function CoverageSimulator({ totalZones }) {
         onChange={(e) => setK(+e.target.value)} />
       <div className="muted mono" style={{ fontSize: 11 }}>top {k} zones = {(100 * k / totalZones).toFixed(1)}% of all zones</div>
 
-      <table style={{ marginTop: 18 }}>
+      <div className="scroll" style={{ maxHeight: "46vh", marginTop: 18 }}>
+      <table style={{ minWidth: 0 }}>
         <thead><tr><th>Deploy top-K priority zones</th><th>Coverage of weighted evidence</th></tr></thead>
         <tbody>
           {curve.map((c) => (
@@ -55,6 +56,7 @@ export default function CoverageSimulator({ totalZones }) {
           ))}
         </tbody>
       </table>
+      </div>
       <p className="note" style={{ marginTop: 14 }}>Headline: enforcing just the top-20 of {totalZones} zones
         covers ≈{curve.find((c) => c.k === 20)?.coverage_pct}% of all weighted obstruction evidence.</p>
     </div>
